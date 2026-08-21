@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.apx  text eol=lf diff
+*.sql  text eol=lf diff
+*.json text eol=lf diff
+*.ps1  text eol=crlf
+*.sh   text eol=lf
+*.png  binary
+*.jpg  binary
+*.zip  binary

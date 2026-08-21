@@ -1,0 +1,9 @@
+*.zip
+*.log
+/tmp/
+tmp/
+apex-exports/
+*.env
+Thumbs.db
+Desktop.ini
+# NOTE: apex/**/.apex/apexlang.json is NOT ignored - it must be committed.
