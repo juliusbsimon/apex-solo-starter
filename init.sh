@@ -1,12 +1,12 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # One-time project setup (Linux/WSL). Unzip into an empty folder, then: ./init.sh
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 read -rp "Short app name, lowercase, no spaces (e.g. portal): " APP
-read -rp "App title (e.g. MARAD - Vessel & Seafarer Information Portal): " APP_TITLE
+read -rp "App title (e.g. ACME - Order Tracking): " APP_TITLE
 read -rp "DEV application id (e.g. 139): " APP_ID
-read -rp "APEX workspace name (e.g. MARAD): " WS
+read -rp "APEX workspace name (e.g. ACME): " WS
 read -rp "SQLcl connection name to create/use (e.g. ${APP^^}_DEV): " CONN
 
 [[ "$APP_ID" =~ ^[0-9]+$ ]] || { echo "application id must be a number" >&2; exit 1; }
@@ -26,7 +26,7 @@ mkdir -p "apex/$APP"; rm -f apex/.gitkeep
 cat <<STEPS
 
 Stamped. Remaining steps:
-  1. Save the connection (parsing schema of workspace $WS) — note: SQLcl's
+  1. Save the connection (parsing schema of workspace $WS) â€” note: SQLcl's
      connection store is per-OS-user, so save it inside WSL even if a Windows
      copy exists:
        sql /nolog
@@ -39,6 +39,7 @@ Stamped. Remaining steps:
   4. Remote:    git remote add origin <url> && git push -u origin main
   5. Determinism check: pull.sh again -> git status must be clean.
 
-Then read RUNBOOK.md — the daily loop (§3) and guardrails (§3b).
+Then read RUNBOOK.md â€” the daily loop (Â§3) and guardrails (Â§3b).
 You can delete init.sh and init.ps1 now (keep whichever OS's scripts you use).
 STEPS
+

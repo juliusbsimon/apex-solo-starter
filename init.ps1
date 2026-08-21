@@ -1,4 +1,4 @@
-<# One-time project setup from the apex-solo-starter archive.
+﻿<# One-time project setup from the apex-solo-starter archive.
    Unzip into an empty folder (short path, e.g. D:\dev\myapp), then:
      powershell -ExecutionPolicy Bypass -File .\init.ps1
    Prompts for the per-project values, stamps them into every file,
@@ -8,9 +8,9 @@ $repo = $PSScriptRoot
 Set-Location $repo
 
 $app      = Read-Host "Short app name, lowercase, no spaces (e.g. portal)"
-$appTitle = Read-Host "App title (e.g. MARAD - Vessel & Seafarer Information Portal)"
+$appTitle = Read-Host "App title (e.g. ACME - Order Tracking)"
 $appId    = Read-Host "DEV application id (e.g. 139)"
-$ws       = Read-Host "APEX workspace name (e.g. MARAD)"
+$ws       = Read-Host "APEX workspace name (e.g. ACME)"
 $conn     = Read-Host "SQLcl connection name to create/use (e.g. $($app.ToUpper())_DEV)"
 
 if (-not ($appId -match '^\d+$')) { throw "application id must be a number" }
@@ -52,3 +52,4 @@ Write-Host "  5. Determinism check: pull.ps1 again -> git status must be clean."
 Write-Host ""
 Write-Host "  Then read RUNBOOK.md - especially the daily loop (SS3) and guardrails (SS3b)."
 Write-Host "  You can delete init.ps1 now."
+
