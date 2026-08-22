@@ -18,27 +18,27 @@ same time.
   (If the project adopts SQLcl Projects instead: `.dbtools/` is committed
   config, `src/database/` holds per-object exports maintained by
   `project export`, and `dist/` is generated — never hand-edited.)
-- `scripts/pull.ps1` — Builder → repo (export + mirror).
-- `scripts/push.ps1` — repo → Builder (validate, then import). **Human-only.**
+- `scripts/pull.sh` / `scripts/pull.ps1` — Builder → repo (export + mirror).
+- `scripts/push.sh` / `scripts/push.ps1` — repo → Builder (validate, then import). **Human-only.**
 - `tmp/` — export staging, gitignored. Ignore its contents.
 
 ## Access boundaries (enforced in `.claude/settings.json` — do not work around)
 
 - You have **no database connection**. `sql /nolog` for `apex validate` is the
   only SQLcl use permitted. Never attempt `sql -name <anything>`.
-- `pull.ps1`, `push.ps1`, `project deploy`, `project release` are human-only.
+- The pull and push scripts (`.sh` and `.ps1`), `project deploy`, and `project release` are human-only.
 - To query the database (does a column exist? what shape is the data?), use
-  `scripts/ro.ps1 -Query "<sql>"` — it runs through the CLAUDE_RO read-only
+  `scripts/ro.sh "<sql>"` (or `scripts/ro.ps1 -Query "<sql>"`) — it runs through the CLAUDE_RO read-only
   account. That is your only database door; it can only read, and that is by
   design, not an obstacle to engineer around. Anything needing more, ask the
   human.
 
 ## Iron rules
 
-1. **Pull before editing.** Run `scripts/pull.ps1` (and check `git status` is
+1. **Pull before editing.** Run `scripts/pull.sh` (WSL) or `scripts/pull.ps1` (Windows) (and check `git status` is
    clean) before touching anything under `apex/`. Never edit a stale export —
    Builder changes made since the last pull would be silently lost on push.
-2. **Never run `scripts/push.ps1`.** An APEXlang import **replaces the entire
+2. **Never run a push script** (`push.sh` / `push.ps1`). An APEXlang import **replaces the entire
    application** in App Builder. You edit and validate; the human reviews
    `git diff` and pushes.
 3. **Validate before declaring done.** After any `.apx` edit:

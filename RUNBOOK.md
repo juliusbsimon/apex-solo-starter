@@ -1,6 +1,6 @@
-# APEX solo-project runbook — APEXlang + VS Code + Git (26.1)
+# APEX solo-project runbook — APEXlang + Git (26.1)
 
-**Scope:** any single-developer APEX 26.1 application. This is the template — copy it into each project's repo as `README.md` (or keep one copy and just follow it), fill in the three placeholders, done. Team-scale projects need a different model; this runbook is for one developer.
+**Scope:** any single-developer APEX 26.1 application. This runbook ships inside the project template — if you arrived via *Use this template* → `init`, every placeholder below (`<app>`, `<APP_ID>`, `<CONN>`) was already stamped into the scripts and `CLAUDE.md` for you, and the manual-setup sections are reference, not tasks. New to Git? Read [GETTING-STARTED.md](GETTING-STARTED.md) first. Team-scale projects need a different model; this runbook is for one developer.
 
 **Windows and Linux/WSL:** every script ships in both forms — `scripts/*.ps1` and `scripts/*.sh` (bash). The workflow is identical; examples below show PowerShell, substitute `./scripts/pull.sh` etc. on WSL. Two WSL notes: install SQLcl *inside* WSL (its saved-connection store is per-OS-user, so `connect -save` must be run there even if a Windows SQLcl exists), and keep the repo on the WSL filesystem (`~/dev/...`) rather than `/mnt/c/...` for git and rsync speed.
 
@@ -91,67 +91,14 @@ Thumbs.db
 
 Note what is **not** ignored: `apex/<app>/.apex/apexlang.json` must be committed (and never hand-edited — it records the meta-metadata version, and editing it breaks validation).
 
-### 2.3 The two scripts
+### 2.3 The scripts (shipped; reference only)
 
-`scripts/pull.ps1` — Builder → files:
+The template ships four scripts, each in PowerShell and bash: `pull` (Builder → repo), `push` (repo → Builder), `apex-validate` (no DB connection needed), and `ro` (read-only DB queries for the agent, §2.5). Don't retype them from a document — the shipped copies are the maintained ones. What matters is *why* they're shaped the way they are:
 
-```powershell
-param(
-  [string]$Conn  = "<CONN>",
-  [int]   $AppId = <APP_ID>,
-  [string]$App   = "<app>"
-)
-$ErrorActionPreference = "Stop"
-$repo  = Split-Path -Parent $PSScriptRoot
-# stage INSIDE the repo (tmp/ is gitignored): SQLcl's export writer
-# relativizes paths and throws "'other' has different root" if the stage
-# and the working directory are on different drives (repo on D:, TEMP on C:)
-$stage = Join-Path $repo "tmp\apex-pull"
-if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-New-Item -ItemType Directory -Path $stage | Out-Null
-
-@"
-whenever sqlerror exit failure
-apex export -applicationid $AppId -dir "$stage" -exptype apexlang -force
-exit success
-"@ | sql -name $Conn
-if ($LASTEXITCODE -ne 0) { throw "export failed" }
-
-$src = (Get-ChildItem $stage -Directory | Select-Object -First 1).FullName
-if (-not $src -or -not (Test-Path (Join-Path $src "application.apx"))) {
-  throw "export incomplete - not mirroring"
-}
-robocopy $src (Join-Path $repo "apex\$App") /MIR /NFL /NDL /NJH /NJS | Out-Null
-if ($LASTEXITCODE -ge 8) { throw "robocopy failed" }
-
-Set-Location $repo
-git status --short
-```
-
-`scripts/push.ps1` — files → Builder:
-
-```powershell
-param(
-  [string]$Conn = "<CONN>",
-  [string]$App  = "<app>"
-)
-$ErrorActionPreference = "Stop"
-$repo = Split-Path -Parent $PSScriptRoot
-$path = Join-Path $repo "apex\$App"
-
-@"
-apex validate -input $path
-exit
-"@ | sql /nolog | Tee-Object -Variable out
-if ($out -notmatch "Validation successful") { throw "validation failed - not importing" }
-
-@"
-whenever sqlerror exit failure
-apex import -input $path
-exit success
-"@ | sql -name $Conn
-if ($LASTEXITCODE -ne 0) { throw "import failed" }
-```
+- **`pull` stages inside the repo** (`tmp/`, gitignored), never `%TEMP%` — SQLcl's export throws `'other' has different root` when the stage and working directory sit on different drives.
+- **`pull` guards before mirroring**: the export must contain `application.apx` or nothing is copied — a half-written export must never be mirrored over the repo, because the mirror deletes files that vanished from the source (that's also what makes deleted pages disappear from Git correctly).
+- **Native commands are exit-code-checked explicitly** — `$ErrorActionPreference`/`set -e` do not catch `sql`, `git`, or `robocopy` failures; the `whenever sqlerror/oserror exit failure` header inside the SQLcl heredoc is what makes a failed export report as one.
+- **`push` refuses to import unless `apex validate` passes** — the destructive operation is gated twice (validation here, and APEX validates again on import).
 
 ### 2.4 Baseline
 
@@ -172,14 +119,14 @@ Create `CLAUDE_RO` so the agent can answer its own schema questions (does this c
 sql /nolog
 SQL> connect -save CLAUDE_RO -savepwd claude_ro/<password>@//host:1521/service
 SQL> exit
-# scripts/ro.ps1 (ships alongside) is the agent's only door to it
+# scripts/ro.sh / ro.ps1 (ship alongside) are the agent's only door to it
 ```
 
 Design notes, because each is deliberate:
 
 - The account gets `CREATE SESSION` + **`READ`** (not `SELECT`) on the schema's tables and views — `READ` can't even `SELECT ... FOR UPDATE` — plus `quota 0`, so it can own nothing. Worst case is a read.
 - **Grants don't cover future objects.** Re-run the grant block in `create-claude-ro.sql` after adding tables — put it in the migration checklist.
-- The agent reaches it only through `scripts/ro.ps1`. This indirection matters: the repo's `.claude/settings.json` **denies `sql -name*` outright, and deny beats allow** in Claude Code's permission model — so the read-only connection can't be allowed directly without also loosening the deny. The wrapper is the single allowed door (`"Bash(*ro.ps1*)"` in the allow list), and the account behind the door is harmless by construction.
+- The agent reaches it only through the `ro` wrapper (`ro.sh` / `ro.ps1`). This indirection matters: the repo's `.claude/settings.json` **denies `sql -name*` outright, and deny beats allow** in Claude Code's permission model — so the read-only connection can't be allowed directly without also loosening the deny. The wrapper is the single allowed door (`"Bash(*ro.sh*)"` / `"Bash(*ro.ps1*)"` in the allow list), and the account behind the door is harmless by construction.
 - Verify the boundary once after setup: as `CLAUDE_RO`, a `select` works, a `create table` and a `delete` both fail.
 
 ---
@@ -267,47 +214,28 @@ SQL> skills list
 
 (alternative: `npx skills add oracle/skills/apex` and `npx skills add oracle/skills/db`). Without the skill, the agent guesses at property names; with it, it knows them.
 
-**Drop a `CLAUDE.md` in the repo root** with the house rules. A full worked sample ships alongside this runbook (`CLAUDE.md` — adjust names and IDs per project). The minimum viable version:
+**The house rules live in `CLAUDE.md`.** Template users: **it already exists** — the template ships it and `init` stamped your app name, ID, and workspace into it; read it once so you know what your agent has been told, and edit it as the project grows its own conventions. Manual-path users: create it in the repo root; this is the minimum viable version (the template's copy is the full worked example):
 
 ```markdown
 # <app> — APEX 26.1 APEXlang project
 
-- ALWAYS run `scripts/pull.ps1` before editing anything under apex/ — never edit a stale export.
+- ALWAYS run `scripts/pull.sh` (or `scripts/pull.ps1`) before editing anything
+  under apex/ — never edit a stale export.
 - Never modify `apex/<app>/.apex/apexlang.json` — it is generated metadata.
-- After editing .apx files, run `scripts/apex-validate` (or `apex validate -input apex/<app>` via `sql /nolog`) and iterate until "Validation successful".
-- NEVER run `scripts/push.ps1` — importing replaces the entire application in the Builder. Editing and validating are yours; pushing is the human's, after reviewing `git diff`.
-- Database code lives in `db/` (CREATE OR REPLACE current-state) and `db/migrations/` (ordered, run-once). A migration ships before the app change that depends on it.
-- Commit at feature granularity with `feat(pNN): ...` / `fix: ...` / `db(pkg): ...` messages.
+- After editing .apx files, run `scripts/apex-validate.sh` (or the .ps1, or
+  `apex validate -input apex/<app>` via `sql /nolog`) and iterate until
+  "Validation successful".
+- NEVER run a push script (`push.sh` / `push.ps1`) — importing replaces the
+  entire application in the Builder. Editing and validating are yours;
+  pushing is the human's, after reviewing `git diff`.
+- Database code lives in `db/` (CREATE OR REPLACE current-state) and
+  `db/migrations/` (ordered, run-once). A migration ships before the app
+  change that depends on it.
+- Commit at feature granularity with `feat(pNN): ...` / `fix: ...` /
+  `db(pkg): ...` messages.
 ```
 
-**Guardrails — enforcement, not etiquette.** CLAUDE.md rules are advisory; the agent follows them, but real prevention lives where breaking a rule is impossible. Two layers, both cheap:
-
-*Layer 1 — no connection, no risk.* The only SQLcl operation the agent needs is `apex validate`, which runs under `sql /nolog` — no credentials, no schema access. The saved named connections (`sql -name <CONN>`) are the keys to the database; everything that uses them (`pull.ps1`, `push.ps1`, `project export/deploy`) stays human. An agent with no connection cannot change a schema, run a migration, or touch data — the risk class doesn't exist.
-
-*Layer 2 — enforce it at the tool layer.* Commit `.claude/settings.json` in the repo root so the rule is mechanical, travels with the repo, and can't be talked around mid-session:
-
-```json
-{
-  "permissions": {
-    "deny": [
-      "Bash(sql -name*)",
-      "Bash(*push.ps1*)",
-      "Bash(*pull.ps1*)",
-      "Bash(*project deploy*)",
-      "Bash(*project release*)"
-    ],
-    "allow": [
-      "Bash(sql /nolog*)"
-    ]
-  }
-}
-```
-
-Deny rules are checked before execution and take precedence over everything else.
-
-*Layer 3 (only if the agent should introspect the DB* — check a column exists, read data shapes*):* create a read-only account — `CREATE USER claude_ro`, grant `CREATE SESSION` plus `SELECT` on the schema's tables, nothing else — save it as its own named connection, and add `"Bash(sql -name CLAUDE_RO*)"` to the allow list. Worst case then is a read.
-
-*Layer 4 (production, belt-and-braces):* all DDL reaches PROD only through reviewed `project deploy` artifacts run under a human connection — drops arrive commented-out by design. A DDL trigger gating schema changes on a context flag is available if policy demands it.
+The same applies to the guardrails below: **template users already have `.claude/settings.json`** — the deny/allow rules ship in the template and cover both shells. The section explains what they do and why, so you can maintain them; there is nothing to install.
 
 **Keep the push human.** The one destructive command stays a button you press after reading the diff. The loop:
 
@@ -349,8 +277,9 @@ Deploy from a clean, committed `main` — tag it (`git tag rel-2026.08.21`) so r
 | Push succeeded but Builder shows old version | You imported a stale export over newer Builder work. Recover from `apex-exports/` (the pre-import snapshot) or `git log`. |
 | Export dies with `IllegalArgumentException: 'other' has different root` | SQLcl bug when the `-dir` target and working directory are on different drives. Stage inside the repo (`tmp\`), not `%TEMP%`. |
 | Every file shows as changed in Git | Line endings — check `.gitattributes` landed before the first commit; if not, `git add --renormalize .` |
+| Page Designer says "Specified page does not exist" for a page that's in the page list | Same incomplete-metadata condition as the ORA-01403 row below — the page's directory row exists but the loader can't assemble it. Same fix. |
 | Pull shows changes you don't recognise | Normal after any import (APEX normalises), or you built something and forgot. Read the diff; it's always the answer. |
-| APEXlang export fails with `ORA-01403` in `WWV_META_META_DATA` | Engine-side bug at your instance's patch level (base 26.1 through 26.1.2 are affected; fixed in Oracle's 26.1.3+ bundles). On a managed platform (AWS RDS, OCI) you cannot patch APEX yourself — fall back to `apex export -applicationid <id> -split -skipExportDate` (SQL format, different code path, per-page files, fully diffable) until the platform ships a fixed APEX version. **When switching formats, also switch the completeness guard in `pull.ps1`**: the split export produces `f<APP_ID>\install.sql` + an `application\` folder, not `application.apx` — check for those instead, or the guard will reject a good export. A "downloaded" App Builder export that won't unzip is the same failure: it's an error page saved under the export's name — look inside before trusting it. |
+| APEXlang export fails with `ORA-01403` in `WWV_META_META_DATA` | **A component somewhere in the app has incomplete stored metadata** (field case: a page item created halfway — a `NATIVE_SWITCH` with no source/template/attributes — from an interrupted Page Designer save). Companion symptoms: App Builder's APEXlang "download" is an HTML error page saved under the export's name, and Page Designer shows "Specified page does not exist" for the broken page — while the classic SQL export still works, because it dumps rows without interpreting them. **Find it by bisection**: export another app (proves the instance is fine) → copy the app, delete all pages, export (works → it's a page; fails → shared components) → halve until one page remains → read its SQL single-page export for a component with far fewer properties than its siblings. **Fix**: delete the page, remove the offending `create_page_*` block from the SQL script, re-import it (single-page SQL import works within the same app + workspace), recreate the component in Page Designer. **Meanwhile**, `apex export -split -skipExportDate` is the fallback export — if you switch to it, also switch pull's completeness guard to check `f<APP_ID>/install.sql` + `application/` instead of `application.apx`, or the guard rejects a good export. |
 
 ---
 
