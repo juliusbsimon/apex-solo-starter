@@ -112,7 +112,7 @@ git push -u origin main
 
 ### 2.5 The read-only agent account (part of standard setup)
 
-Create `CLAUDE_RO` so the agent can answer its own schema questions (does this column exist? what shape is the data?) without ever holding a key that writes. Ships alongside this runbook as `create-claude-ro.sql` — run it **as an admin user** (on RDS: the master user), then save the connection and drop in the wrapper:
+Create `CLAUDE_RO` so the agent can answer its own schema questions (does this column exist? what shape is the data?) without ever holding a key that writes. Ships alongside this runbook as `create-claude-ro.sql` — run it **as an admin user** (on RDS: the master user) — it **prompts for the password, hidden**, so there is nothing to edit in the file and nothing stored in Git. Then save the connection:
 
 ```powershell
 # save the connection once

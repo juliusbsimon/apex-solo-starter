@@ -13,10 +13,19 @@ variable app_schema varchar2(128)
 variable ro_user    varchar2(128)
 variable ro_pass    varchar2(128)
 
+-- Password is PROMPTED, hidden, at run time — never stored in this file
+-- (this file is committed to git; a real password here would leak into
+-- history). Only used on first creation; on re-runs enter anything.
+accept ro_pass_input char prompt 'Password for the new read-only user: ' hide
+
 begin
-  :app_schema := '__WORKSPACE__';                              -- the app's parsing schema
+  :app_schema := '__WORKSPACE__';               -- the app's parsing schema
   :ro_user    := 'CLAUDE_RO';
-  :ro_pass    := 'ChangeMe-Strong-Password-Here';      -- used only on first creation
+  :ro_pass    := '&ro_pass_input';
+  if :ro_pass is null or lower(:ro_pass) like 'change%' then
+    raise_application_error(-20001,
+      'Refusing to create user with an empty or placeholder password.');
+  end if;
 end;
 /
 
