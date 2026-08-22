@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # One-time project setup (Linux/WSL). Unzip into an empty folder, then: ./init.sh
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -26,7 +26,7 @@ mkdir -p "apex/$APP"; rm -f apex/.gitkeep
 cat <<STEPS
 
 Stamped. Remaining steps:
-  1. Save the connection (parsing schema of workspace $WS) â€” note: SQLcl's
+  1. Save the connection (parsing schema of workspace $WS) — note: SQLcl's
      connection store is per-OS-user, so save it inside WSL even if a Windows
      copy exists:
        sql /nolog
@@ -39,7 +39,6 @@ Stamped. Remaining steps:
   4. Remote:    git remote add origin <url> && git push -u origin main
   5. Determinism check: pull.sh again -> git status must be clean.
 
-Then read RUNBOOK.md â€” the daily loop (Â§3) and guardrails (Â§3b).
+Then read RUNBOOK.md — the daily loop (§3) and guardrails (§3b).
 You can delete init.sh and init.ps1 now (keep whichever OS's scripts you use).
 STEPS
-

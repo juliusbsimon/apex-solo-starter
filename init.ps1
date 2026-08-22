@@ -1,4 +1,4 @@
-﻿<# One-time project setup from the apex-solo-starter archive.
+<# One-time project setup from the apex-solo-starter archive.
    Unzip into an empty folder (short path, e.g. D:\dev\myapp), then:
      powershell -ExecutionPolicy Bypass -File .\init.ps1
    Prompts for the per-project values, stamps them into every file,
@@ -52,4 +52,3 @@ Write-Host "  5. Determinism check: pull.ps1 again -> git status must be clean."
 Write-Host ""
 Write-Host "  Then read RUNBOOK.md - especially the daily loop (SS3) and guardrails (SS3b)."
 Write-Host "  You can delete init.ps1 now."
-
