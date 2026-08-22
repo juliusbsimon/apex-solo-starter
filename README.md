@@ -12,4 +12,6 @@
    Fresh machine? `./scripts/setup-prereqs.sh` (WSL/Linux) or
    `.\scripts\check-prereqs.ps1` (Windows) first.
 
+   New to Git entirely? Start with **[GETTING-STARTED.md](GETTING-STARTED.md)**.
+
    Full documentation: **[RUNBOOK.md](RUNBOOK.md)**
