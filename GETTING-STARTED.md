@@ -18,15 +18,44 @@ your laptop and can be shared. Your APEX app becomes files via this starter's
 
 1. **Get a GitHub account** at github.com (free), and ask to be added to the
    team's repositories if they are private.
-2. **Install the tools.** In WSL/Linux run `./scripts/setup-prereqs.sh` (does
-   everything, including Git); on Windows run `.\scripts\check-prereqs.ps1`
-   and follow what it prints.
+
+2. **Install Git itself.** (The project's setup scripts install everything
+   else, but they live inside the repo — and you need Git to get the repo.)
+
+   **Windows** — open PowerShell and run:
+
+   ```
+   winget install Git.Git
+   ```
+
+   Close and reopen PowerShell afterwards so `git` is found. Then allow local
+   scripts to run (one time):
+
+   ```
+   Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+   ```
+
+   **WSL** (Linux inside Windows — recommended) — if you don't have WSL yet,
+   run `wsl --install` in PowerShell **as administrator**, reboot, and open
+   the "Ubuntu" app it installed. Then, in that Ubuntu window:
+
+   ```
+   sudo apt update && sudo apt install -y git
+   ```
+
+   **Check it worked:** `git --version` prints a version number in either case.
+
 3. **Introduce yourself to Git** (it stamps your name on your work):
 
    ```
    git config --global user.name  "Your Name"
    git config --global user.email "you@example.com"
    ```
+
+4. **The rest of the tools come later** — after you clone your project
+   (next section), run `./scripts/setup-prereqs.sh` (WSL: installs Java,
+   SQLcl, everything) or `.\scripts\check-prereqs.ps1` (Windows: checks and
+   tells you the install command for anything missing).
 
 ## Starting a project from this template
 
