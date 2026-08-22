@@ -26,6 +26,13 @@ Scripted: on WSL/Linux run `./scripts/setup-prereqs.sh` (installs JDK 21, git, r
 
 ## 2. One-time project setup (~15 minutes per project)
 
+> **Started from the template repo?** (GitHub → *Use this template* → clone →
+> `./init.sh` / `.\init.ps1`) Then **§2.2 and §2.3 are already done** — init
+> created the folder layout, stamped the scripts, and set up git. Do §2.1
+> (the connection), then jump to §2.4 (baseline) and §2.5 (agent account).
+> The sections below are the manual path, kept for reference and for
+> understanding what init did on your behalf.
+
 ### 2.1 Save a connection
 
 ```powershell

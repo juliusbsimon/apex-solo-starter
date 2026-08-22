@@ -114,6 +114,8 @@ stopping point (end of a feature, end of the day).
 | "I changed files and regret it" (not yet committed) | `git restore <file>` — puts back the last committed version |
 | "push was rejected: fetch first" | Someone (or you, via the GitHub website) changed the online copy. `git pull --rebase`, then `git push`. |
 | "I'm lost, is my stuff saved?" | `git status`. Clean = everything committed. Then `git push` and it's on GitHub too. |
+| "Permission denied" running `./init.sh` or a script | `chmod +x init.sh scripts/*.sh` — happens on WSL when the repo was pushed from Windows. |
+| "No such file or directory" on a command you pasted | You copied the prompt too. Paste only what comes **after** the `$` (or `>`). |
 | "I broke a page in App Builder and want yesterday's version" | Find yesterday's commit on GitHub, open the page's file, copy what you need — or ask a teammate before using bigger hammers. |
 
 The one rule that keeps you safe: **commit and push before trying anything
@@ -132,6 +134,19 @@ committed cannot.
 | diff | The line-by-line difference between two states |
 | origin | Git's name for "the GitHub copy of this repo" |
 
-Next: read the [RUNBOOK](RUNBOOK.md) — it explains the APEX-specific parts
-(the pull/push scripts, validation, and the one rule about editing in only
-one place at a time).
+## Where you are now, and what's next
+
+If you followed this page, you have: the tools installed, your project cloned
+from the template, `init` run, and (per its printed steps) a saved SQLcl
+connection and a first commit. **That covers the RUNBOOK's §1 and §2** — you
+do not need to repeat them.
+
+Continue in the [RUNBOOK](RUNBOOK.md) at:
+
+- **§2.5** — the read-only agent account (recommended, one-time)
+- **§3 — the daily loop** — this is the part you'll live in
+- **§5 — troubleshooting** — when something looks wrong
+
+The one rule to carry with you: **edit in one place at a time** — either in
+App Builder (then pull), or in the files (then push). Never both between
+pulls. The RUNBOOK explains why.
