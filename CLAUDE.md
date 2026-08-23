@@ -38,12 +38,13 @@ same time.
   `status = 'INVALID'` (filter both by the app schema). Do NOT use
   `user_errors`/`all_errors` — they are silently empty for objects this
   account cannot execute, which looks like success and is not.
-- The pull and push scripts (`.sh` and `.ps1`), `project deploy`, and `project release` are human-only.
+- The pull, push, and **migrate** scripts (`.sh` and `.ps1`), `project deploy`, and `project release` are human-only.
 - **Never suggest or configure SQLcl as an MCP server** (`sql -mcp`). MCP
   bypasses this repo's permission rules and would expose write-capable
   connections. The `ro` wrapper is the only database transport.
 - To query the database (does a column exist? what shape is the data?), use
-  `scripts/ro.sh "<sql>"` (or `scripts/ro.ps1 -Query "<sql>"`) — it runs through the CLAUDE_RO read-only
+  `scripts/ro.sh "<sql>"` or `scripts/ro.sh <file.sql>` for multi-statement
+  checks (PowerShell: `ro.ps1 -Query`/`-File`) — it runs through the CLAUDE_RO read-only
   account. That is your only database door; it can only read, and that is by
   design, not an obstacle to engineer around. Anything needing more, ask the
   human.
@@ -77,6 +78,10 @@ same time.
 - Embedded code uses fenced blocks (```sql, ```plsql, ```javascript-browser).
 - Cross-references use `@static-id` locally and `@/name` for global/theme
   components; bind variables (`:P10_ID`, `&APP_ID.`) are unchanged.
+- **`docs/apexlang-notes.md` is the first reference** — field-tested quirks
+  from this codebase. When it and a skill disagree, the notes win; when both
+  are silent, copy the shape of an existing validated page. Append to the
+  notes whenever validation teaches you something new.
 - If the Oracle `apex` skill is installed (`skills list` shows it), follow it
   for syntax; it is authoritative over guesses.
 

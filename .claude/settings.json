@@ -7,14 +7,17 @@
       "Bash(*project deploy*)",
       "Bash(*project release*)",
       "Bash(*push.sh*)",
-      "Bash(*pull.sh*)"
+      "Bash(*pull.sh*)",
+      "Bash(*migrate.sh*)",
+      "Bash(*migrate.ps1*)"
     ],
     "allow": [
       "Bash(sql /nolog*)",
       "Bash(*ro.ps1*)",
       "Bash(*ro.sh*)",
       "Bash(*apex-validate.sh*)",
-      "Bash(*apex-validate.ps1*)"
+      "Bash(*apex-validate.ps1*)",
+      "Bash(python3*)"
     ]
   }
 }

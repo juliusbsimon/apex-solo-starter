@@ -7,3 +7,8 @@
 *.png  binary
 *.jpg  binary
 *.zip  binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.pdf  binary
+*.xml  -text

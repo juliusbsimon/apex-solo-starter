@@ -100,7 +100,7 @@ The template ships four scripts, each in PowerShell and bash: `pull` (Builder �
 - **Native commands are exit-code-checked explicitly** — `$ErrorActionPreference`/`set -e` do not catch `sql`, `git`, or `robocopy` failures; the `whenever sqlerror/oserror exit failure` header inside the SQLcl heredoc is what makes a failed export report as one.
 - **`push` refuses to import unless `apex validate` passes** — the destructive operation is gated twice (validation here, and APEX validates again on import).
 
-### 2.4 Baseline
+### 2.4 Baseline — and validate it immediately
 
 ```powershell
 .\scripts\pull.ps1
@@ -109,6 +109,8 @@ git commit -m "chore: baseline APEXlang export of <app>"
 git remote add origin <url>       # a remote is your only offsite backup - don't skip it
 git push -u origin main
 ```
+
+**Then run `./scripts/apex-validate.sh` before anything else.** A fresh export of a long-lived app frequently carries **Builder-side errors** — duplicate button names, orphan items pointing at another page's region — that the Builder tolerated for years but validation does not. One field case: 10 errors in the baseline export. Until they're fixed, the push gate rejects everything and nobody knows why. Fix them in the Builder (or the files), re-pull, commit; *then* the workflow is open for business. The validate script prints a per-file error count so a long dump stays readable.
 
 ### 2.5 The read-only agent account (part of standard setup)
 
@@ -166,7 +168,7 @@ The final pull-and-commit matters: APEX normalises things on import, and you wan
 
 APEXlang does not version database objects; that half needs its own mechanism.
 
-**Tier 1 — hand-rolled (fine for a small, slow-moving schema):** `db/` holds current-state `CREATE OR REPLACE` sources; `db/migrations/YYYYMMDD-nn-*.sql` holds ordered, run-once DDL/data changes. You are the tracking system. Migration runs before the app change that needs it.
+**Tier 1 — hand-rolled (fine for a small, slow-moving schema):** `db/` holds current-state `CREATE OR REPLACE` sources; `db/migrations/YYYYMMDD-nn-*.sql` holds ordered, run-once DDL/data changes. You are the tracking system. Migration runs before the app change that needs it — via **`scripts/migrate.sh <file> [ADMIN_CONN]`** (human-only, like push): it runs the file, then refreshes CLAUDE_RO's grants automatically, the forget-prone step that otherwise leaves the agent blind to new tables. Conventions: `db/migrations/README.md`.
 
 **Tier 2 — SQLcl Projects (adopt when the schema evolves actively):** SQLcl's built-in CI/CD workflow (`project` command, SQLcl 24.3+, use 26.x). It exports schema objects to per-object files, generates Liquibase changesets from **git diffs between branches**, and tracks deployments in `DATABASECHANGELOG` so nothing applies twice.
 
@@ -203,6 +205,8 @@ Gotchas that bite first-timers: **drops are generated commented-out** (review an
 ### 3b. Working with Claude Code instead of (or alongside) VS Code
 
 The repo is the interface — an agent editing `.apx` files sits in exactly the same loop as you do, with `apex validate` as the impartial gate. Three pieces of setup:
+
+**The project's own field notes beat any skill.** `docs/apexlang-notes.md` holds APEXlang specifics learned from real validation failures (drawer pages use `contentBody`, IGs need a `savedReport` with `displayColumns`, date-picker binds are strings, and more) — plus the standing rule that the best reference is an existing validated page in this app. Append to it whenever validation teaches you something. Optionally keep known-good page exports in `templates/` as scaffolds for new pages (`templates/README.md`). `docs/` is also the home for source documents (specs, sample files) — binary formats there are marked in `.gitattributes` so they don't churn line endings.
 
 **Give it the APEXlang skill.** Oracle publishes agent skills that teach the `.apx` grammar and the database conventions:
 
