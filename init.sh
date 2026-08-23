@@ -7,6 +7,8 @@ read -rp "Short app name, lowercase, no spaces (e.g. portal): " APP
 read -rp "App title (e.g. ACME - Order Tracking): " APP_TITLE
 read -rp "DEV application id (e.g. 139): " APP_ID
 read -rp "APEX workspace name (e.g. ACME): " WS
+read -rp "Parsing schema [default: $WS] (workspace and schema often differ!): " SCHEMA
+SCHEMA="${SCHEMA:-$WS}"
 read -rp "SQLcl connection name to create/use (e.g. ${APP^^}_DEV): " CONN
 
 [[ "$APP_ID" =~ ^[0-9]+$ ]] || { echo "application id must be a number" >&2; exit 1; }
@@ -17,6 +19,7 @@ find . -type f \( -name "*.sh" -o -name "*.ps1" -o -name "*.md" -o -name "*.sql"
     -e "s|__APP_TITLE__|$APP_TITLE|g" \
     -e "s|__APP_ID__|$APP_ID|g" \
     -e "s|__WORKSPACE__|$WS|g" \
+    -e "s|__SCHEMA__|$SCHEMA|g" \
     -e "s|__CONN__|$CONN|g" \
     -e "s|__APP__|$APP|g"
 

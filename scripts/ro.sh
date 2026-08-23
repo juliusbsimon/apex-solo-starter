@@ -15,9 +15,9 @@ if [[ -f "$ARG" ]]; then QUERY="$(cat "$ARG")"; else QUERY="$ARG"; fi
 sql -name "$CONN" <<SQLEOF
 set define off
 set pagesize 200 linesize 240 trimspool on
--- CLAUDE_RO owns nothing and has no synonyms; default to the app schema
+-- CLAUDE_RO owns nothing and has no synonyms; default to the PARSING SCHEMA
 -- so queries don't need schema prefixes (needs no extra privilege)
-alter session set current_schema = __WORKSPACE__;
+alter session set current_schema = __SCHEMA__;
 $QUERY
 exit
 SQLEOF

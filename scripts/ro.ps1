@@ -13,7 +13,7 @@ if (-not $Query) { throw "usage: ro.ps1 -Query `"select ...`"  or  -File checks.
 @"
 set define off
 set pagesize 200 linesize 240 trimspool on
-alter session set current_schema = __WORKSPACE__;
+alter session set current_schema = __SCHEMA__;
 $Query
 exit
 "@ | sql -name $Conn

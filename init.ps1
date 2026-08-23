@@ -11,6 +11,8 @@ $app      = Read-Host "Short app name, lowercase, no spaces (e.g. portal)"
 $appTitle = Read-Host "App title (e.g. ACME - Order Tracking)"
 $appId    = Read-Host "DEV application id (e.g. 139)"
 $ws       = Read-Host "APEX workspace name (e.g. ACME)"
+$schema   = Read-Host "Parsing schema (blank = same as workspace; they often differ!)"
+if (-not $schema) { $schema = $ws }
 $conn     = Read-Host "SQLcl connection name to create/use (e.g. $($app.ToUpper())_DEV)"
 
 if (-not ($appId -match '^\d+$')) { throw "application id must be a number" }
@@ -20,6 +22,7 @@ $tokens = @{
   "__APP_TITLE__" = $appTitle
   "__APP_ID__"    = $appId
   "__WORKSPACE__" = $ws
+  "__SCHEMA__"    = $schema
   "__CONN__"      = $conn
 }
 

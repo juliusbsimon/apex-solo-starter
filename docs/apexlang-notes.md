@@ -28,7 +28,7 @@ Builder teaches you something; this is the project's institutional memory.
   bind in `to_date(:PNN_X, '<same mask>')` in SQL.
 - String binds inside `union all` branches need explicit `to_number()` or the
   branches disagree on type.
-- Filter items on drawer parents: a Change DA plus
+- Filter items (any page): a Change DA plus
   `warnOnUnsavedChanges: ignore`, or navigation nags about unsaved changes.
 
 ## Reports

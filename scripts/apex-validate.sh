@@ -12,10 +12,11 @@ SQLEOF
 echo "$OUT"
 if ! grep -q "Validation successful" <<< "$OUT"; then
   echo
-  echo "== errors/warnings per file =="
-  awk 'tolower($0) ~ /error|warning/ {
-         for (i=1; i<=NF; i++) if ($i ~ /\.apx/) { gsub(/[,:;]$/,"",$i); f[$i]++ }
-       }
-       END { for (k in f) printf "%6d  %s\n", f[k], k }' <<< "$OUT" | sort -rn
+  echo "== findings per file =="
+  # SQLcl prints "File: <path>" and "Error:/Warning:" on SEPARATE lines -
+  # attribute each finding to the most recent File: line (field-tested)
+  awk '/^File:/ { f=$2 }
+       /^(Error|Warning):/ && f != "" { c[f]++; if ($1=="Error:") e[f]++ }
+       END { for (k in c) printf "%6d  %s%s\n", c[k], k, (e[k] ? " (" e[k] " errors)" : " (warnings only)") }' <<< "$OUT" | sort -rn
   exit 1
 fi

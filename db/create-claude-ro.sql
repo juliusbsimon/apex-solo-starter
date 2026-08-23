@@ -19,7 +19,7 @@ variable ro_pass    varchar2(128)
 accept ro_pass_input char prompt 'Password for the new read-only user: ' hide
 
 begin
-  :app_schema := '__WORKSPACE__';               -- the app's parsing schema
+  :app_schema := '__SCHEMA__';                  -- the app's parsing schema
   :ro_user    := 'CLAUDE_RO';
   :ro_pass    := '&ro_pass_input';
   if :ro_pass is null or lower(:ro_pass) like 'change%' then
