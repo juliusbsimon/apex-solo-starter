@@ -5,6 +5,8 @@
 # The repo's .claude/settings.json denies `sql -name*` to the agent;
 # this wrapper is the single allowed door, and it can only read.
 set -euo pipefail
+# Claude Code / cron shells do not source .bashrc - find SQLcl ourselves
+command -v sql >/dev/null 2>&1 || PATH="$HOME/sqlcl/bin:$PATH"
 QUERY="${1:?usage: ro.sh \"select ...\"}"
 CONN="${2:-CLAUDE_RO}"
 sql -name "$CONN" <<SQLEOF

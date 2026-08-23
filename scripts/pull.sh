@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Builder -> repo. Run before editing anything, and after Builder work.
 set -euo pipefail
+# Claude Code / cron shells do not source .bashrc - find SQLcl ourselves
+command -v sql >/dev/null 2>&1 || PATH="$HOME/sqlcl/bin:$PATH"
 CONN="${1:-__CONN__}"
 APP_ID="${2:-__APP_ID__}"
 APP="${3:-__APP__}"

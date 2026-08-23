@@ -26,6 +26,13 @@ same time.
 
 - You have **no database connection**. `sql /nolog` for `apex validate` is the
   only SQLcl use permitted. Never attempt `sql -name <anything>`.
+- If `sql` is not on PATH (non-interactive shells don't source `.bashrc`),
+  SQLcl lives at `~/sqlcl/bin/sql` on WSL/Linux. The `scripts/*.sh` wrappers
+  already handle this — prefer them over calling `sql` directly.
+- Before asking the human to run a migration, **pre-flight it read-only** via
+  `scripts/ro.sh`: query the data dictionary (`all_tables`, `all_tab_columns`,
+  `all_objects`) to confirm referenced objects exist and new names don't
+  collide. Executing the migration remains the human's step.
 - The pull and push scripts (`.sh` and `.ps1`), `project deploy`, and `project release` are human-only.
 - To query the database (does a column exist? what shape is the data?), use
   `scripts/ro.sh "<sql>"` (or `scripts/ro.ps1 -Query "<sql>"`) — it runs through the CLAUDE_RO read-only
