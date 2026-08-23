@@ -212,7 +212,9 @@ SQL> skills sync -skill-name apex,db
 SQL> skills list
 ```
 
-(alternative: `npx skills add oracle/skills/apex` and `npx skills add oracle/skills/db`). Without the skill, the agent guesses at property names; with it, it knows them.
+(alternative: `npx skills add oracle/skills/apex` and `npx skills add oracle/skills/db`). Without the skill, the agent guesses at property names; with it, it knows them. **Re-run `skills sync` every few weeks** — the skills are updated alongside APEX releases.
+
+> ⚠️ **Do NOT configure SQLcl as an MCP server** (`claude mcp add ... sql -mcp`), even though Oracle's getting-started material suggests it. MCP tool calls are not Bash commands — they bypass the `.claude/settings.json` deny rules entirely, giving the agent direct access to **every saved connection, including the write-capable ones**. That undoes the entire access-boundary design in one config line. The `ro.sh` / `ro.ps1` wrapper is the supported door; if the agent needs more DB reach, widen CLAUDE_RO's grants, not the transport.
 
 **The house rules live in `CLAUDE.md`.** Template users: **it already exists** — the template ships it and `init` stamped your app name, ID, and workspace into it; read it once so you know what your agent has been told, and edit it as the project grows its own conventions. Manual-path users: create it in the repo root; this is the minimum viable version (the template's copy is the full worked example):
 
@@ -245,6 +247,14 @@ pull.ps1  →  tell Claude Code what to change  →  it edits + validates until 
 ```
 
 Same shape as the VS Code loop with the agent as editor. VS Code stays useful for hand-editing when you want the interactive experience; it's an option, not a dependency.
+
+**Useful prompt pattern — scoped fixes.** When a push/import fails, feed the error back with an explicit blast-radius limit:
+
+> The following error occurred during import: `<paste error>`. Analyze and fix **only the failing APEXlang source or directly related file. Do not modify unrelated components.**
+
+The constraint matters: without it, agents "helpfully" refactor neighbors while fixing the error, and your diff review gets noisy exactly when you need it clean.
+
+**No standalone SQLcl on a machine?** The VS Code extension bundles one: `~/.vscode/extensions/oracle.sql-developer-<version>/dbtools/sqlcl/bin/sql` (Windows: same path under `C:\Users\<user>\.vscode\...`, `sql.exe`). Fine as a fallback for the scripts; the standalone install from `setup-prereqs.sh` is still preferred (predictable path, updated on your schedule).
 
 ---
 

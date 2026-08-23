@@ -72,6 +72,36 @@ begin
 
   dbms_output.put_line('READ granted on '||v_granted||' objects ('
                        ||v_skipped||' skipped).');
+
+  ------------------------------------------------------------------
+  -- 3. Dictionary access for compile-error checking.
+  --    USER_/ALL_ERRORS only show objects the user owns or can access;
+  --    CLAUDE_RO owns nothing and has no EXECUTE on packages, so those
+  --    views are silently EMPTY for exactly the objects that matter.
+  --    DBA_ERRORS / DBA_OBJECTS are what it needs. Read-only either way.
+  ------------------------------------------------------------------
+  begin
+    execute immediate 'grant select_catalog_role to "'||:ro_user||'"';
+    dbms_output.put_line('SELECT_CATALOG_ROLE granted (DBA_ERRORS, DBA_OBJECTS etc. visible).');
+  exception
+    when others then
+      -- Not grantable by this admin (common on managed platforms).
+      -- On AWS RDS, use the rdsadmin procedure per view instead:
+      begin
+        execute immediate
+          'begin rdsadmin.rdsadmin_util.grant_sys_object(''DBA_ERRORS'','''
+          ||:ro_user||''',''SELECT''); end;';
+        execute immediate
+          'begin rdsadmin.rdsadmin_util.grant_sys_object(''DBA_OBJECTS'','''
+          ||:ro_user||''',''SELECT''); end;';
+        dbms_output.put_line('RDS path: DBA_ERRORS + DBA_OBJECTS granted via rdsadmin.');
+      exception
+        when others then
+          dbms_output.put_line('WARNING: could not grant dictionary access ('
+            ||substr(sqlerrm,1,200)||'). Grant DBA_ERRORS/DBA_OBJECTS to '
+            ||:ro_user||' manually.');
+      end;
+  end;
 end;
 /
 

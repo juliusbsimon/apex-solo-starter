@@ -33,7 +33,15 @@ same time.
   `scripts/ro.sh`: query the data dictionary (`all_tables`, `all_tab_columns`,
   `all_objects`) to confirm referenced objects exist and new names don't
   collide. Executing the migration remains the human's step.
+- After the human runs a migration or compiles code, **check the result
+  yourself**: `dba_errors` for compile errors and `dba_objects` where
+  `status = 'INVALID'` (filter both by the app schema). Do NOT use
+  `user_errors`/`all_errors` — they are silently empty for objects this
+  account cannot execute, which looks like success and is not.
 - The pull and push scripts (`.sh` and `.ps1`), `project deploy`, and `project release` are human-only.
+- **Never suggest or configure SQLcl as an MCP server** (`sql -mcp`). MCP
+  bypasses this repo's permission rules and would expose write-capable
+  connections. The `ro` wrapper is the only database transport.
 - To query the database (does a column exist? what shape is the data?), use
   `scripts/ro.sh "<sql>"` (or `scripts/ro.ps1 -Query "<sql>"`) — it runs through the CLAUDE_RO read-only
   account. That is your only database door; it can only read, and that is by
@@ -71,6 +79,16 @@ same time.
   components; bind variables (`:P10_ID`, `&APP_ID.`) are unchanged.
 - If the Oracle `apex` skill is installed (`skills list` shows it), follow it
   for syntax; it is authoritative over guesses.
+
+## PL/SQL conventions
+
+- **`SQLERRM` / `SQLCODE` never appear inside a SQL statement** (INSERT,
+  UPDATE, SELECT...) — that raises PLS-00231. Capture them into local
+  variables in the exception handler first, then use the variables:
+  `v_msg := substr(sqlerrm, 1, 4000);` then `insert ... values (v_msg)`.
+  Same rule for any PL/SQL-only function.
+- Exception handlers that log **re-raise** unless the swallow is explicit
+  and commented — `when others then null;` is never acceptable bare.
 
 ## Commit style
 
