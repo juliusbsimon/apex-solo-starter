@@ -220,7 +220,13 @@ SQL> project deploy -file artifact/<app>-db-1.1.0.zip   -- connect to the target
 
 Gotchas that bite first-timers: **drops are generated commented-out** (review and uncomment deliberately); **DML isn't auto-tracked** (use `project stage add-custom -file-name <file>` for data changes); exclude `DBTOOLS$%` tables in `.dbtools/filters/project.filters` (and mind the fussy trailing-comma syntax there); commit `.dbtools/` — it's config, not scratch.
 
-**Boundary with APEXlang:** `project export` can technically carry APEX apps (`APEX_APP` object type), but its APEXlang integration is slated for a future SQLcl release — so keep the app in `apex/` via `pull.ps1` and keep the `application_id` filters out of `project.filters`. One repo, two lanes, no double-tracking.
+**Boundary with APEXlang — the exclusion must be EXPLICIT.** SQLcl Projects treats APEX apps as schema objects and exports them **by default**: with no filter, `project export` pulls *every app in the workspace*, in both APEXlang and full APPLICATION_SOURCE (field case: 1.2 GB of duplicated app exports next to 29 MB of actual database objects). Right after `project init`, add to `.dbtools/filters/ddl.filters`:
+
+```
+export_type not in ('APEX_APPLICATIONS','APEX'),
+```
+
+(mind the trailing comma — the filter parser requires it). The app stays governed by `pull.sh`/APEXlang; Projects handles only database objects. One repo, two lanes, no double-tracking — but the fence has to be built, not assumed.
 
 ### 3b. Working with Claude Code instead of (or alongside) VS Code
 
