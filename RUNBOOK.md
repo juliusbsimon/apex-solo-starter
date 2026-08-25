@@ -202,6 +202,11 @@ SQL> exit
 git add -A && git commit -m "db: baseline SQLcl project export"
 ```
 
+Then two tidy-ups the tool doesn't do for you:
+
+- **`project init` appends its boilerplate to an existing `README.md`** ("Example Template… It's fun and easy!") rather than leaving it alone — strip that before committing, your README is not a scratchpad.
+- **Update `CLAUDE.md`'s layout section** to reflect the shift: `db/` conventions give way to `.dbtools/` (committed config), `src/database/` (per-object exports via `project export`), and `dist/` (generated — never hand-edited). The template's CLAUDE.md carries this as a parenthetical; adopting Projects is the moment to promote it to the actual description.
+
 For an **existing populated schema**, baseline the target with `liquibase changelog-sync` rather than deploying release one — otherwise the first deploy tries to re-create everything.
 
 The loop (git-driven — Projects detects change by diffing your branch against the base branch, default `master`; set yours with `project config set -name git.defaultBranch -value main`):
