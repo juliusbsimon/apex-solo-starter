@@ -72,7 +72,15 @@ your laptop and can be shared. Your APEX app becomes files via this starter's
 
    The first push/pull asks you to sign in to GitHub in a browser — normal.
 3. Run `./init.sh` (WSL) or `.\init.ps1` (Windows) and answer its prompts.
-4. Follow the steps it prints (save DB connection, first pull, first commit).
+4. Follow the steps it prints. In short: **save the database connection**
+   (inside WSL if that's where you work) → optionally create the agent's
+   read-only account (`db/create-claude-ro.sql`, run as admin — it prompts
+   for a password) → **first pull** (`./scripts/pull.sh`) → **first commit
+   and push** → pull again to confirm `git status` comes back clean →
+   **run `./scripts/apex-validate.sh`** (old apps often export with
+   Builder-side errors that must be fixed before the workflow opens up).
+   The same list lives in RUNBOOK §2 "Setup at a glance" if the terminal
+   output has scrolled away.
 
 ## The five commands that are 95% of Git
 

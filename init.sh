@@ -35,13 +35,17 @@ Stamped. Remaining steps:
        sql /nolog
        connect -save $CONN -savepwd schema/<password>@//host:1521/service
   2. (Optional, recommended) agent read-only account:
-       edit db/create-claude-ro.sql (:app_schema / password), run as admin,
-       then: connect -save CLAUDE_RO -savepwd claude_ro/<pw>@//host:1521/service
+       run db/create-claude-ro.sql as an admin user - schema is already
+       stamped and it prompts for a password, nothing to edit - then:
+       connect -save CLAUDE_RO -savepwd claude_ro/<pw>@//host:1521/service
   3. Baseline:  ./scripts/pull.sh   then review, and:
        git add -A && git commit -m "chore: baseline APEXlang export of $APP"
   4. Remote:    git remote add origin <url> && git push -u origin main
   5. Determinism check: pull.sh again -> git status must be clean.
+  6. Validate the baseline: ./scripts/apex-validate.sh - long-lived apps
+     often export with Builder-side errors; fix them before relying on push.
 
+This checklist also lives in RUNBOOK.md SS2 "Setup at a glance".
 Then read RUNBOOK.md — the daily loop (§3) and guardrails (§3b).
 You can delete init.sh and init.ps1 now (keep whichever OS's scripts you use).
 STEPS

@@ -26,6 +26,26 @@ Scripted: on WSL/Linux run `./scripts/setup-prereqs.sh` (installs JDK 21, git, r
 
 ## 2. One-time project setup (~15 minutes per project)
 
+### Setup at a glance (the checklist `init` prints, kept here for reference)
+
+```
+1. Save the connection (the workspace's PARSING SCHEMA), inside WSL if that's
+   where you work — SQLcl's connection store is per-OS-user:
+     sql /nolog
+     connect -save <CONN> -savepwd schema/<password>@//host:1521/service
+2. Agent read-only account (recommended): run db/create-claude-ro.sql as an
+   admin user — it prompts for a password, nothing to edit — then:
+     connect -save CLAUDE_RO -savepwd claude_ro/<pw>@//host:1521/service
+3. Baseline:   ./scripts/pull.sh   → review → git add -A && git commit
+4. Remote:     git remote add origin <url> && git push -u origin main
+5. Determinism check: pull again → git status must be clean
+6. Validate:   ./scripts/apex-validate.sh — a long-lived app's baseline often
+   carries Builder-side errors; the push gate is closed until they're fixed
+```
+
+Details for each step follow below.
+
+
 > **Started from the template repo?** (GitHub → *Use this template* → clone →
 > `./init.sh` / `.\init.ps1`) Then **§2.2 and §2.3 are already done** — init
 > created the folder layout, stamped the scripts, and set up git. Do §2.1
