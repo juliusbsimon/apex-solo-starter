@@ -72,6 +72,11 @@ same time.
    static IDs.
 7. **Page numbers**: new pages continue the existing numbering; check
    `apex/__APP__/pages/` for the highest `pNNNNN-` before creating one.
+8. **Never write a literal secret into any file** — no passwords, tokens, or
+   keys, ever, in any tracked or untracked file. `db/create-claude-ro.sql`
+   prompts for its password at run time BY DESIGN; if an interactive prompt
+   blocks something you're doing, that script was not yours to run — report
+   the obstacle to the human, do not remove it.
 
 ## APEXlang editing notes
 

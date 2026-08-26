@@ -37,7 +37,7 @@ Stamped. Remaining steps:
   2. (Optional, recommended) agent read-only account:
        run db/create-claude-ro.sql as an admin user - schema is already
        stamped and it prompts for a password, nothing to edit - then:
-       connect -save ${APP}_CLAUDE_RO -savepwd claude_ro/<pw>@//host:1521/service
+       connect -save ${APP}_CLAUDE_RO -savepwd ${APP}_claude_ro/<pw>@//host:1521/service
   3. Baseline:  ./scripts/pull.sh   then review, and:
        git add -A && git commit -m "chore: baseline APEXlang export of $APP"
   4. Remote:    git remote add origin <url> && git push -u origin main

@@ -20,7 +20,9 @@ accept ro_pass_input char prompt 'Password for the new read-only user: ' hide
 
 begin
   :app_schema := '__SCHEMA__';                  -- the app's parsing schema
-  :ro_user    := 'CLAUDE_RO';
+  -- per-project user: two apps sharing one database must not share one RO
+  -- account (one password, union of grants, muddied audit)
+  :ro_user    := upper('__APP___CLAUDE_RO');
   :ro_pass    := '&ro_pass_input';
   if :ro_pass is null or lower(:ro_pass) like 'change%' then
     raise_application_error(-20001,

@@ -35,7 +35,7 @@ Scripted: on WSL/Linux run `./scripts/setup-prereqs.sh` (installs JDK 21, git, r
      connect -save <CONN> -savepwd schema/<password>@//host:1521/service
 2. Agent read-only account (recommended): run db/create-claude-ro.sql as an
    admin user — it prompts for a password, nothing to edit — then:
-     connect -save <APP>_CLAUDE_RO -savepwd claude_ro/<pw>@//host:1521/service
+     connect -save <APP>_CLAUDE_RO -savepwd <APP>_CLAUDE_RO/<pw>@//host:1521/service
    (per-project name: SQLcl saved connections are GLOBAL to the OS user — a
    generic CLAUDE_RO gets silently reused by another project's ro.sh and
    connects to the wrong database)
@@ -145,7 +145,7 @@ Create `CLAUDE_RO` so the agent can answer its own schema questions (does this c
 # another project's ro.sh against the wrong database (symptom: ORA-01435
 # from the wrapper's alter session, unfamiliar schemas in all_tables)
 sql /nolog
-SQL> connect -save <app>_CLAUDE_RO -savepwd claude_ro/<password>@//host:1521/service
+SQL> connect -save <app>_CLAUDE_RO -savepwd <app>_claude_ro/<password>@//host:1521/service
 SQL> exit
 # scripts/ro.sh / ro.ps1 (ship alongside, stamped with the name) are the
 # agent's only door to it; the wrapper's `alter session set current_schema`

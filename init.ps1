@@ -48,7 +48,7 @@ Write-Host "       connect -save $conn -savepwd schema/<password>@//host:1521/se
 Write-Host "  2. (Optional, recommended) Agent read-only account:"
 Write-Host "       run db\create-claude-ro.sql as an admin user - schema is stamped"
 Write-Host "       and it prompts for a password, nothing to edit - then:"
-Write-Host "       then: connect -save `$($app)_CLAUDE_RO -savepwd claude_ro/<pw>@//host:1521/service"
+Write-Host "       then: connect -save `$($app)_CLAUDE_RO -savepwd `$($app)_claude_ro/<pw>@//host:1521/service"
 Write-Host "  3. Baseline:  .\scripts\pull.ps1   then review, and:"
 Write-Host "       git add -A ; git commit -m 'chore: baseline APEXlang export of $app'"
 Write-Host "  4. Remote:    git remote add origin <url> ; git push -u origin main"
