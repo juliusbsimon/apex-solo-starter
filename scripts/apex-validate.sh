@@ -39,11 +39,14 @@ if [[ ${#PAGES[@]} -gt 0 ]]; then
   rm -rf "$STAGE"; mkdir -p "$STAGE"
   rsync -a --exclude 'pages/' "$SRC/" "$STAGE/"
   mkdir -p "$STAGE/pages"
-  cp "$SRC"/pages/p00000-*.apx "$STAGE/pages/" 2>/dev/null || true   # global page, if present
+  # page files may be pNNNNN-<slug>.apx OR bare pNNNNN.apx - accept both
+  cp "$SRC"/pages/p00000-*.apx "$SRC"/pages/p00000.apx "$STAGE/pages/" 2>/dev/null || true  # global page, if present
   for p in "${PAGES[@]}"; do
-    f=("$SRC"/pages/${p}-*.apx)
-    [[ -f "${f[0]}" ]] || { echo "no such page file: pages/${p}-*.apx" >&2; exit 1; }
-    cp "${f[@]}" "$STAGE/pages/"
+    found=0
+    for f in "$SRC/pages/${p}.apx" "$SRC"/pages/${p}-*.apx; do
+      [[ -f "$f" ]] && { cp "$f" "$STAGE/pages/"; found=1; }
+    done
+    [[ $found -eq 1 ]] || { echo "no such page file: pages/${p}[-*].apx" >&2; exit 1; }
   done
   echo "== page-subset validation (${PAGES[*]}) - stamp will NOT be written =="
   OUT="$(sql /nolog <<SQLEOF
