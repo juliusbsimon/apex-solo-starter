@@ -64,7 +64,10 @@ SQL> connect -save <CONN> -savepwd schema/<password>@//host:1521/service
 SQL> exit
 ```
 
-Connect as the workspace's **parsing schema**. For APEXlang *import* the workspace also needs ORDS 26.1.1+ and at least one REST-enabled schema — if the first import fails, that's the first thing to check.
+Connect as the workspace's **parsing schema**. Connection names are
+**case-sensitive** — save them with exactly the casing the stamped scripts
+expect (`grep CONN scripts/*.sh` or `scripts\*.ps1` shows the authoritative
+spelling; `connmgr list` shows what's actually saved). For APEXlang *import* the workspace also needs ORDS 26.1.1+ and at least one REST-enabled schema — if the first import fails, that's the first thing to check.
 
 ### 2.2 Repo skeleton
 

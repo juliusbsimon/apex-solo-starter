@@ -244,7 +244,10 @@ works — but only after these checks, learned the hard way:
   process — check `ps` after killing one.
 - Saved connection names are **global to the OS user**, shared across every
   project on the machine — see RUNBOOK §2.5 for the per-project naming rule.
-  `connmgr list` / `connmgr show <name>` audits what a name points at.
+  They are also **case-sensitive**: `sql -name portal_CLAUDE_RO` will not
+  find a connection saved as `PORTAL_CLAUDE_RO`. Save with EXACTLY the
+  casing the stamped scripts use — `grep CONN scripts/*.sh` is the
+  authority. `connmgr list` / `connmgr show <name>` audits what exists.
 - The `apex_*` dictionary views are **workspace-security-filtered**: the
   read-only account sees them empty unless its schema is associated with the
   workspace — "count pages in the live app" is not a check the RO door can

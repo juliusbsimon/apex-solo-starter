@@ -28,7 +28,8 @@ mkdir -p "apex/$APP"; rm -f apex/.gitkeep
 
 cat <<STEPS
 
-Stamped. Remaining steps:
+Stamped. Remaining steps (connection names are CASE-SENSITIVE - save them
+exactly as printed below; the scripts use these spellings verbatim):
   1. Save the connection (parsing schema of workspace $WS) — note: SQLcl's
      connection store is per-OS-user, so save it inside WSL even if a Windows
      copy exists:

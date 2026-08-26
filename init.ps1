@@ -41,7 +41,8 @@ Remove-Item "apex\.gitkeep" -ErrorAction SilentlyContinue
 if (-not (Test-Path ".git")) { git init -b main | Out-Null }
 
 Write-Host ""
-Write-Host "Stamped. Remaining steps:" -ForegroundColor Green
+Write-Host "Stamped. Remaining steps (connection names are CASE-SENSITIVE -" -ForegroundColor Green
+Write-Host "save them exactly as printed; the scripts use these spellings verbatim):" -ForegroundColor Green
 Write-Host "  1. Save the connection (parsing schema of workspace $ws):"
 Write-Host "       sql /nolog"
 Write-Host "       connect -save $conn -savepwd schema/<password>@//host:1521/service"
