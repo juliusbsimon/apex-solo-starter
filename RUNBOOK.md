@@ -2,6 +2,13 @@
 
 **Scope:** any single-developer APEX 26.1 application. This runbook ships inside the project template — if you arrived via *Use this template* → `init`, every placeholder below (`<app>`, `<APP_ID>`, `<CONN>`) was already stamped into the scripts and `CLAUDE.md` for you, and the manual-setup sections are reference, not tasks. New to Git? Read [GETTING-STARTED.md](GETTING-STARTED.md) first. Team-scale projects need a different model; this runbook is for one developer.
 
+**Updating an existing project to the latest template:** run
+`bash scripts/update-from-template.sh` from the project root (old projects
+that predate the script: clone the template to `/tmp/starter` and run it from
+there — the header comment has the exact lines). It overwrites template-owned
+scripts, adds new pieces, side-copies anything you may have customized as
+`*.template.new` for hand-merging, and re-stamps everything.
+
 **Windows and Linux/WSL:** every script ships in both forms — `scripts/*.ps1` and `scripts/*.sh` (bash). The workflow is identical; examples below show PowerShell, substitute `./scripts/pull.sh` etc. on WSL. Two WSL notes: install SQLcl *inside* WSL (its saved-connection store is per-OS-user, so `connect -save` must be run there even if a Windows SQLcl exists), and keep the repo on the WSL filesystem (`~/dev/...`) rather than `/mnt/c/...` for git and rsync speed.
 
 **Placeholders used throughout:** `<app>` (short lowercase name, e.g. `timesheets`) · `<APP_ID>` (DEV application id) · `<CONN>` (saved SQLcl connection, e.g. `TIMESHEETS_DEV`).
