@@ -35,7 +35,10 @@ Scripted: on WSL/Linux run `./scripts/setup-prereqs.sh` (installs JDK 21, git, r
      connect -save <CONN> -savepwd schema/<password>@//host:1521/service
 2. Agent read-only account (recommended): run db/create-claude-ro.sql as an
    admin user — it prompts for a password, nothing to edit — then:
-     connect -save CLAUDE_RO -savepwd claude_ro/<pw>@//host:1521/service
+     connect -save <APP>_CLAUDE_RO -savepwd claude_ro/<pw>@//host:1521/service
+   (per-project name: SQLcl saved connections are GLOBAL to the OS user — a
+   generic CLAUDE_RO gets silently reused by another project's ro.sh and
+   connects to the wrong database)
 3. Baseline:   ./scripts/pull.sh   → review → git add -A && git commit
 4. Remote:     git remote add origin <url> && git push -u origin main
 5. Determinism check: pull again → git status must be clean
@@ -137,11 +140,16 @@ git push -u origin main
 Create `CLAUDE_RO` so the agent can answer its own schema questions (does this column exist? what shape is the data?) without ever holding a key that writes. Ships alongside this runbook as `create-claude-ro.sql` — run it **as an admin user** (on RDS: the master user) — it **prompts for the password, hidden**, so there is nothing to edit in the file and nothing stored in Git. Then save the connection:
 
 ```powershell
-# save the connection once
+# save the connection once - NAME IT PER PROJECT: saved connections are
+# global to the OS user, and a generic CLAUDE_RO gets silently reused by
+# another project's ro.sh against the wrong database (symptom: ORA-01435
+# from the wrapper's alter session, unfamiliar schemas in all_tables)
 sql /nolog
-SQL> connect -save CLAUDE_RO -savepwd claude_ro/<password>@//host:1521/service
+SQL> connect -save <app>_CLAUDE_RO -savepwd claude_ro/<password>@//host:1521/service
 SQL> exit
-# scripts/ro.sh / ro.ps1 (ship alongside) are the agent's only door to it
+# scripts/ro.sh / ro.ps1 (ship alongside, stamped with the name) are the
+# agent's only door to it; the wrapper's `alter session set current_schema`
+# doubles as the wrong-database alarm
 ```
 
 Design notes, because each is deliberate:

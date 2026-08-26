@@ -17,7 +17,7 @@ whenever sqlerror exit failure
 exit success
 SQLEOF
 
-echo "== refreshing CLAUDE_RO grants =="
+echo "== refreshing read-only-account grants =="
 if [[ -n "$ADMIN" ]]; then
   # interactive so the (ignored-on-rerun) password prompt works
   sql -name "$ADMIN" @"$REPO/db/create-claude-ro.sql"

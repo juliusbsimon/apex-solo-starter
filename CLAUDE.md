@@ -47,7 +47,10 @@ same time.
   checks (PowerShell: `ro.ps1 -Query`/`-File`) — it runs through the CLAUDE_RO read-only
   account. That is your only database door; it can only read, and that is by
   design, not an obstacle to engineer around. Anything needing more, ask the
-  human.
+  human. End every statement you pass it with `;` (the wrapper appends one if
+  missing, but multi-statement files are your responsibility). If it errors
+  with ORA-01435 or `all_tables` looks unfamiliar, STOP — the saved
+  connection points at the wrong database; tell the human.
 
 ## Iron rules
 
@@ -84,6 +87,18 @@ same time.
   notes whenever validation teaches you something new.
 - If the Oracle `apex` skill is installed (`skills list` shows it), follow it
   for syntax; it is authoritative over guesses.
+
+## Judgment boundaries (fix mechanically vs ask first)
+
+- Renaming a duplicate `buttonName`, deleting a column-less `sort`/
+  `displayColumn` block, mapping legacy enum values: mechanical, fix and note.
+- **Removing an `authorizationScheme` reference — even a dangling numeric
+  one — is a security decision: ask the human.** Same for anything touching
+  authentication, session protection, or email escaping.
+- Deprecated ≠ dead: before deleting a deprecated property, determine whether
+  it still changes runtime behavior (see docs/apexlang-notes.md, "Cleaning up
+  deprecation warnings"). When the answer needs data or trigger inspection,
+  do the read-only checks; when it stays ambiguous, keep and document.
 
 ## PL/SQL conventions
 
