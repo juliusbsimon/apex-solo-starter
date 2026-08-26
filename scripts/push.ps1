@@ -30,7 +30,17 @@ exit
 "@ | sql -name $Conn
 $out
 if ($out -match '(?i)import successful') {
-  Write-Host "Imported. Smoke-test in the browser, then pull.ps1 + commit." -ForegroundColor Green
+  # imports always disable scheduled jobs - run post-import re-enables, if any
+  Get-ChildItem (Join-Path $repo "scripts\post-import\*.sql") -ErrorAction SilentlyContinue |
+    Sort-Object Name | ForEach-Object {
+      Write-Host "== post-import: $($_.Name) ==" -ForegroundColor Cyan
+      @"
+set serveroutput on
+@$($_.FullName)
+exit
+"@ | sql -name $Conn
+    }
+  Write-Host "Imported. Smoke-test in the browser (verify one automation fires), then pull.ps1 + commit." -ForegroundColor Green
 } else {
   Write-Host "IMPORT DID NOT SUCCEED - read the output above. Nothing was replaced." -ForegroundColor Red
   exit 1

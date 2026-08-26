@@ -170,6 +170,10 @@ Data corruption:
   "Imported." message on `Import successful` in the actual output. A tool
   that reports success it didn't verify is worse than one that crashes: it
   manufactures false evidence.
+- **Every successful import disables the app's scheduled jobs** (see the
+  promotion section below for the full mechanics) — the push scripts run
+  `scripts/post-import/*.sql` to re-enable them; an app with automations and
+  an empty post-import directory is a silent outage waiting to happen.
 - "Push succeeded but nothing changed" is almost always a failed or
   interrupted import, **not** upsert semantics — an application import
   replaces the whole app, deletions included (field-confirmed). Check the
@@ -199,13 +203,18 @@ shared-component removals), replacing the main app via
 `apex import -input <src> -id <MAIN_ID> -name "<main name>" [-alias <main alias>]`
 works — but only after these checks, learned the hard way:
 
-- **WC exports strip runtime activation state.** Automations lose
-  `scheduleStatus: active`; REST data source sync jobs lose
-  `jobIsActive: true` (APEX pauses both inside a working copy). Importing the
-  WC source over main **silently disables every scheduled job in
-  production** — price feeds, syncs, notifications. Before the replace,
-  export main and copy its activation flags into the source. After the
-  replace, verify one automation actually fires.
+- **Every import disables all scheduled jobs — re-enable is a mandatory
+  post-step.** Automations and REST source sync jobs come out of ANY import
+  disabled, even when the source carries `scheduleStatus: active` /
+  `jobIsActive: true` (activation is runtime state the import does not
+  honor; WC exports additionally strip it from the files). Carrying the
+  flags in source keeps the repo honest but does NOT survive the import.
+  After importing, bulk re-enable via `apex_automation.enable` and
+  `apex_rest_source_sync.enable` inside an `apex_session.create_session`
+  context — `scripts/post-import/*.sql` (run automatically by push) does
+  this; keep its target lists synced with which jobs should be live. Then
+  verify one automation actually fires. Dictionary checks:
+  `apex_appl_automations`, `apex_appl_web_src_modules.sync_is_active`.
 - **Drift-check against main first** — mandatory with multiple developers.
   Export main as APEXlang (`-skipExportDate`) and diff against the repo's
   pre-edit baseline commit. Classify each difference: own WC work (expected),
