@@ -23,9 +23,19 @@ else
     || { echo "validation failed - not importing" >&2; exit 1; }
 fi
 
-sql -name "$CONN" <<SQLEOF
-whenever sqlerror exit failure
-apex import -input $REPO/apex/$APP
-exit success
+# NOTE: `apex` is a SQLcl command, not SQL - `whenever sqlerror` does NOT
+# catch its failures. Success is judged from the actual output, and the
+# workspace is passed explicitly: on a schema granted to multiple
+# workspaces, an import without -workspace bails silently.
+OUT="$(sql -name "$CONN" <<SQLEOF
+apex import -input $REPO/apex/$APP -workspace __WORKSPACE__
+exit
 SQLEOF
-echo "Imported. Smoke-test in the browser, then pull.sh + commit."
+)"
+echo "$OUT"
+if grep -qi "import successful" <<< "$OUT"; then
+  echo "Imported. Smoke-test in the browser, then pull.sh + commit."
+else
+  echo "IMPORT DID NOT SUCCEED - read the output above. Nothing was replaced." >&2
+  exit 1
+fi

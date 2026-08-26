@@ -21,10 +21,17 @@ if ((Test-Path $stamp) -and ((Get-Content $stamp -Raw) -eq (Get-TreeHash))) {
   & (Join-Path $PSScriptRoot "apex-validate.ps1") -App $App
   if ($LASTEXITCODE -ne 0) { throw "validation failed - not importing" }
 }
-@"
-whenever sqlerror exit failure
-apex import -input $path
-exit success
+# `apex` is a SQLcl command, not SQL - exit codes don't reflect its failures.
+# Judge success from the output, and pass the workspace explicitly (a schema
+# granted to multiple workspaces makes an unqualified import bail silently).
+$out = @"
+apex import -input $path -workspace __WORKSPACE__
+exit
 "@ | sql -name $Conn
-if ($LASTEXITCODE -ne 0) { throw "import failed" }
-Write-Host "Imported. Smoke-test in the browser, then pull.ps1 + commit." -ForegroundColor Green
+$out
+if ($out -match '(?i)import successful') {
+  Write-Host "Imported. Smoke-test in the browser, then pull.ps1 + commit." -ForegroundColor Green
+} else {
+  Write-Host "IMPORT DID NOT SUCCEED - read the output above. Nothing was replaced." -ForegroundColor Red
+  exit 1
+}
