@@ -47,6 +47,15 @@ Builder teaches you something; this is the project's institutional memory.
 - A page with no alias exports as bare `pNNNNN.apx`, not `pNNNNN-<slug>.apx` —
   anything globbing page files must accept both.
 
+## Encoding
+
+- **Non-ASCII literals in `.apx` embedded SQL are an encoding hazard** — the
+  round-trip crosses several SQLcl I/O boundaries that don't all agree on
+  charset, and a mangled literal passes validation and corrupts silently at
+  runtime. Build special characters with `chr()` codepoints (AL32UTF8)
+  instead: `chr(176)` for °, `chr(8212)` for —, `unistr('\00e9')` for é.
+  Keeps the file pure ASCII, which no boundary can damage.
+
 ## Running `apex validate`
 
 - Full validation runtime scales with **page count** — a large app takes tens

@@ -84,6 +84,9 @@ same time.
   `shared-components/lovs.apx`, all lists share `lists.apx`, etc. — edits to
   one shared component touch a file containing every one of its type.
 - Embedded code uses fenced blocks (```sql, ```plsql, ```javascript-browser).
+- **Never put non-ASCII characters in embedded SQL/PLSQL literals** — build
+  them with `chr()` / `unistr()` codepoints instead (encoding boundaries in
+  the round-trip mangle raw special characters silently).
 - Cross-references use `@static-id` locally and `@/name` for global/theme
   components; bind variables (`:P10_ID`, `&APP_ID.`) are unchanged.
 - **`docs/apexlang-notes.md` is the first reference** — field-tested quirks
