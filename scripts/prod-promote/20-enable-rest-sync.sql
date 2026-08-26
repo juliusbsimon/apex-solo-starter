@@ -1,4 +1,5 @@
--- Re-enable REST data source sync jobs after import (imports disable them).
+-- MANUAL, PROMOTE-ONLY: re-enable REST source sync after a PRODUCTION
+-- import. Never an automatic hook (see README.md).
 declare
   l_app_id constant number := __APP_ID__;
   l_n      pls_integer := 0;

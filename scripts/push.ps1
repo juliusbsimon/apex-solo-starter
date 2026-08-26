@@ -30,17 +30,10 @@ exit
 "@ | sql -name $Conn
 $out
 if ($out -match '(?i)import successful') {
-  # imports always disable scheduled jobs - run post-import re-enables, if any
-  Get-ChildItem (Join-Path $repo "scripts\post-import\*.sql") -ErrorAction SilentlyContinue |
-    Sort-Object Name | ForEach-Object {
-      Write-Host "== post-import: $($_.Name) ==" -ForegroundColor Cyan
-      @"
-set serveroutput on
-@$($_.FullName)
-exit
-"@ | sql -name $Conn
-    }
-  Write-Host "Imported. Smoke-test in the browser (verify one automation fires), then pull.ps1 + commit." -ForegroundColor Green
+  Write-Host "Imported. Smoke-test in the browser, then pull.ps1 + commit." -ForegroundColor Green
+  Write-Host "NOTE: the import disabled any scheduled jobs in the target app." -ForegroundColor Yellow
+  Write-Host "      Dev apps: usually fine. PRODUCTION promote: run the manual" -ForegroundColor Yellow
+  Write-Host "      re-enable scripts - see scripts\prod-promote\README.md" -ForegroundColor Yellow
 } else {
   Write-Host "IMPORT DID NOT SUCCEED - read the output above. Nothing was replaced." -ForegroundColor Red
   exit 1

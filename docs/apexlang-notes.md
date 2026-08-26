@@ -171,9 +171,11 @@ Data corruption:
   that reports success it didn't verify is worse than one that crashes: it
   manufactures false evidence.
 - **Every successful import disables the app's scheduled jobs** (see the
-  promotion section below for the full mechanics) — the push scripts run
-  `scripts/post-import/*.sql` to re-enable them; an app with automations and
-  an empty post-import directory is a silent outage waiting to happen.
+  promotion section below for the full mechanics). Re-enabling is a MANUAL,
+  promote-only step (`scripts/prod-promote/*.sql`) — never an automatic
+  push hook: an auto-hook asserts state rather than restoring it, silently
+  re-enabling deliberately paused jobs on routine pushes, and dev pushes
+  don't need automations running at all.
 - "Push succeeded but nothing changed" is almost always a failed or
   interrupted import, **not** upsert semantics — an application import
   replaces the whole app, deletions included (field-confirmed). Check the
@@ -209,10 +211,11 @@ works — but only after these checks, learned the hard way:
   `jobIsActive: true` (activation is runtime state the import does not
   honor; WC exports additionally strip it from the files). Carrying the
   flags in source keeps the repo honest but does NOT survive the import.
-  After importing, bulk re-enable via `apex_automation.enable` and
-  `apex_rest_source_sync.enable` inside an `apex_session.create_session`
-  context — `scripts/post-import/*.sql` (run automatically by push) does
-  this; keep its target lists synced with which jobs should be live. Then
+  After importing over PRODUCTION, bulk re-enable via
+  `apex_automation.enable` and `apex_rest_source_sync.enable` inside an
+  `apex_session.create_session` context — `scripts/prod-promote/*.sql`,
+  run MANUALLY as part of the promote runbook (never an auto-hook); keep
+  its target lists synced with which jobs should be live. Then
   verify one automation actually fires. Dictionary checks:
   `apex_appl_automations`, `apex_appl_web_src_modules.sync_is_active`.
 - **Drift-check against main first** — mandatory with multiple developers.

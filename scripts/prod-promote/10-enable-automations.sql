@@ -1,4 +1,6 @@
--- Re-enable automations after import (imports always disable them).
+-- MANUAL, PROMOTE-ONLY: re-enable automations after a PRODUCTION import
+-- (imports always disable them). Never wire into an automatic hook - it
+-- would silently re-enable deliberately paused jobs on routine pushes.
 -- Edit the list: only the automations that SHOULD be live in this app.
 declare
   l_app_id constant number := __APP_ID__;

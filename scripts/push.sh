@@ -34,18 +34,10 @@ SQLEOF
 )"
 echo "$OUT"
 if grep -qi "import successful" <<< "$OUT"; then
-  # imports always disable scheduled jobs (automations, REST sync) -
-  # run the post-import re-enable scripts, if any
-  for f in "$REPO"/scripts/post-import/*.sql; do
-    [[ -f "$f" ]] || continue
-    echo "== post-import: $(basename "$f") =="
-    sql -name "$CONN" <<SQLEOF2
-set serveroutput on
-@$f
-exit
-SQLEOF2
-  done
-  echo "Imported. Smoke-test in the browser (verify one automation fires), then pull.sh + commit."
+  echo "Imported. Smoke-test in the browser, then pull.sh + commit."
+  echo "NOTE: the import disabled any scheduled jobs in the target app."
+  echo "      Dev apps: usually fine. PRODUCTION promote: run the manual"
+  echo "      re-enable scripts - see scripts/prod-promote/README.md"
 else
   echo "IMPORT DID NOT SUCCEED - read the output above. Nothing was replaced." >&2
   exit 1
