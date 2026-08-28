@@ -15,8 +15,9 @@ variable ro_pass    varchar2(128)
 
 -- Password is PROMPTED, hidden, at run time — never stored in this file
 -- (this file is committed to git; a real password here would leak into
--- history). Only used on first creation; on re-runs enter anything.
-accept ro_pass_input char prompt 'Password for the new read-only user: ' hide
+-- history). It is only used when the user does not exist yet:
+-- on a grants-refresh re-run, just press Enter.
+accept ro_pass_input char prompt 'Password for read-only user (Enter if user already exists): ' hide
 
 begin
   :app_schema := '__SCHEMA__';                  -- the app's parsing schema
@@ -24,30 +25,33 @@ begin
   -- account (one password, union of grants, muddied audit)
   :ro_user    := upper('__APP___CLAUDE_RO');
   :ro_pass    := '&ro_pass_input';
-  if :ro_pass is null or lower(:ro_pass) like 'change%' then
-    raise_application_error(-20001,
-      'Refusing to create user with an empty or placeholder password.');
-  end if;
 end;
 /
 
 declare
-  e_user_exists exception;
-  pragma exception_init(e_user_exists, -1920);
   v_granted  pls_integer := 0;
   v_skipped  pls_integer := 0;
 begin
   ------------------------------------------------------------------
   -- 1. the user: create session only, quota 0 (can own nothing)
   ------------------------------------------------------------------
+  declare
+    l_exists pls_integer;
   begin
-    execute immediate 'create user "'||:ro_user||'" identified by "'||:ro_pass||'"'
-                    ||' default tablespace users temporary tablespace temp'
-                    ||' quota 0 on users';
-    dbms_output.put_line('User '||:ro_user||' created.');
-  exception
-    when e_user_exists then
-      dbms_output.put_line('User '||:ro_user||' already exists - grants refreshed only.');
+    select count(*) into l_exists from dba_users where username = :ro_user;
+    if l_exists = 0 then
+      -- creation path: a real password is required HERE, and only here
+      if :ro_pass is null or lower(:ro_pass) like 'change%' then
+        raise_application_error(-20001,
+          'User '||:ro_user||' does not exist - re-run and supply a real password to create it.');
+      end if;
+      execute immediate 'create user "'||:ro_user||'" identified by "'||:ro_pass||'"'
+                      ||' default tablespace users temporary tablespace temp'
+                      ||' quota 0 on users';
+      dbms_output.put_line('User '||:ro_user||' created.');
+    else
+      dbms_output.put_line('User '||:ro_user||' exists - grants refreshed only (password input ignored).');
+    end if;
   end;
 
   execute immediate 'grant create session to "'||:ro_user||'"';
