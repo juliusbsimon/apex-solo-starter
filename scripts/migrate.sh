@@ -12,6 +12,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [[ -f "$FILE" ]] || { echo "no such file: $FILE" >&2; exit 1; }
 echo "== running $FILE as $CONN =="
 sql -name "$CONN" <<SQLEOF
+set define off
 whenever sqlerror exit failure
 @$FILE
 exit success

@@ -265,6 +265,12 @@ works — but only after these checks, learned the hard way:
   unless filtered — `export_type not in ('APEX_APPLICATIONS','APEX'),` in
   `.dbtools/filters/ddl.filters`; and `project init` appends boilerplate to
   README.md (strip it).
+- **Any wrapper feeding SQL files to SQLcl needs `set define off`** unless
+  substitution is deliberately wanted. A `&` in a string literal (URLs,
+  `'&end_date='`) triggers "Substitution cancelled" — and because earlier
+  statements in the file already ran, the file is left **partially applied**,
+  the worst state for a run-once migration. (Bit `ro.sh` first, then
+  `migrate.sh`; both now set it.)
 - Terminal discipline: paste one command at a time, never including the
   prompt (`$`, `>`, `SQL>`); hand long connect strings to `sql` as a bash
   argument — line wrap at the SQL prompt inserts real newlines into strings.

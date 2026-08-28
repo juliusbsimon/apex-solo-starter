@@ -11,6 +11,7 @@ $repo = Split-Path -Parent $PSScriptRoot
 if (-not (Test-Path $File)) { throw "no such file: $File" }
 Write-Host "== running $File as $Conn ==" -ForegroundColor Cyan
 @"
+set define off
 whenever sqlerror exit failure
 @$File
 exit success
