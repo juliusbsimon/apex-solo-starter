@@ -10,8 +10,8 @@
 #   bash /tmp/starter/scripts/update-from-template.sh
 #
 # File policy:
-#   OVERWRITTEN (template-owned): scripts/*.sh|*.ps1 (except this script's
-#     local copy, replaced from the template like the rest),
+#   OVERWRITTEN (template-owned): scripts/*.sh|*.ps1 (this script's own
+#     local copy is replaced too, but LAST and via mv — see end of file),
 #     .claude/settings.json, db/create-claude-ro.sql,
 #     db/refresh-claude-ro-grants.sql, db/migrations/README.md,
 #     RUNBOOK.md, GETTING-STARTED.md
@@ -49,14 +49,18 @@ stamp() {
   sed -i "s|$tTITLE|$APP|g; s|$tID|$APP_ID|g; s|$tWS|$WS|g; s|$tSCHEMA|$SCHEMA|g; s|$tCONN|$CONN|g; s|$tAPP|$APP|g" "$@"
 }
 
-# ---- template-owned: overwrite (self excluded from stamping as second belt)
+# ---- template-owned: overwrite. SELF IS NOT IN THIS LOOP: bash reads a
+# script lazily while running it, so cp-ing new content over this file would
+# make bash resume at the old byte offset inside new text and abort with a
+# syntax error, leaving everything after the cp (the stamping!) not run.
+# Self is replaced at the very END of this script, atomically, via mv.
 mkdir -p scripts db/migrations .claude docs templates
 STAMP_LIST=()
 for f in pull.sh push.sh apex-validate.sh ro.sh migrate.sh setup-prereqs.sh \
-         pull.ps1 push.ps1 apex-validate.ps1 ro.ps1 migrate.ps1 check-prereqs.ps1 "$SELF"; do
+         pull.ps1 push.ps1 apex-validate.ps1 ro.ps1 migrate.ps1 check-prereqs.ps1; do
   [[ -f "$STARTER/scripts/$f" ]] || continue
   cp "$STARTER/scripts/$f" "scripts/$f"
-  [[ "$f" == "$SELF" ]] || STAMP_LIST+=("scripts/$f")
+  STAMP_LIST+=("scripts/$f")
 done
 cp "$STARTER/.claude/settings.json" .claude/
 cp "$STARTER/db/create-claude-ro.sql" db/
@@ -105,3 +109,11 @@ echo "  2. RO connection: scripts expect '${APP}_CLAUDE_RO' (case-sensitive)."
 echo "     connmgr list shows what exists; re-save if yours differs."
 echo "  3. Review: git diff   then commit:"
 echo "     git add -A && git commit -m 'chore: update scripts from template' && git push"
+
+# ---- LAST LINES ON PURPOSE: replace this script itself. mv swaps in a new
+# inode, so the bash that is still reading THIS file keeps its old bytes and
+# finishes cleanly; a cp here (or earlier) would corrupt the running parse.
+TMPSELF="$(mktemp "scripts/.$SELF.XXXXXX")"
+cp "$STARTER/scripts/$SELF" "$TMPSELF"
+chmod +x "$TMPSELF"
+mv -f "$TMPSELF" "scripts/$SELF"
