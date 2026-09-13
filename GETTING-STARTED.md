@@ -71,6 +71,23 @@ your laptop and can be shared. Your APEX app becomes files via this starter's
    ```
 
    The first push/pull asks you to sign in to GitHub in a browser — normal.
+   That is Git Credential Manager logging you in with a token it stores and
+   renews itself, so prefer it when the browser window works.
+
+   **If no browser opens** (common in WSL, or on a server): either point WSL
+   at the Windows credential manager —
+
+   ```
+   git config --global credential.helper \
+     "/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe"
+   ```
+
+   — or use a **personal access token (PAT)**: GitHub → Settings → Developer
+   settings → *Fine-grained tokens* → generate one scoped to **just this
+   repository** with Contents: read/write, then paste it when git asks for a
+   password (the username is your GitHub name). Treat the token like a
+   password: it goes into the prompt, never into a file in the repo, and it
+   expires — regenerating it is normal, not a sign something broke.
 3. Run `./init.sh` (WSL) or `.\init.ps1` (Windows) and answer its prompts.
 4. Follow the steps it prints. In short: **save the database connection**
    (inside WSL if that's where you work) → optionally create the agent's
