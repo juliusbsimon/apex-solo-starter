@@ -32,5 +32,9 @@ if (-not $src -or -not (Test-Path (Join-Path $src "application.apx"))) {
 robocopy $src (Join-Path $repo "apex\$App") /MIR /NFL /NDL /NJH /NJS | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
 
+# stamp the pull date: push.ps1 checks `apex list -changesSince <this>` so a
+# Builder edit made after this pull is caught before an import clobbers it
+Get-Date -Format "yyyy-MM-dd" | Set-Content (Join-Path $repo "tmp\.pulled-$App")
+
 Set-Location $repo
 git status --short

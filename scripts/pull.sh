@@ -31,4 +31,8 @@ fi
 mkdir -p "$REPO/apex/$APP"
 rsync -a --delete "$SRC/" "$REPO/apex/$APP/"
 
+# stamp the pull date: push.sh checks `apex list -changesSince <this>` so a
+# Builder edit made after this pull is caught before an import clobbers it
+date +%F > "$REPO/tmp/.pulled-$APP"
+
 cd "$REPO" && git status --short

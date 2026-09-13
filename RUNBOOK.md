@@ -192,7 +192,7 @@ Commit at feature granularity, not week granularity — `git log -p apex/<app>/p
 .\scripts\pull.ps1                # ALWAYS fresh files first - never edit a stale export
 git add -A; git commit -m "chore: pre-edit sync"
 # ... edit .apx in VS Code (Ctrl+Space completion, Problems panel validates live) ...
-.\scripts\push.ps1                # validate + import
+.\scripts\push.ps1                # drift check + validate + import
 # smoke-test in the browser
 .\scripts\pull.ps1                # re-export what APEX actually stored
 git add -A; git commit -m "refactor: rename all shipment refs"
@@ -200,7 +200,7 @@ git add -A; git commit -m "refactor: rename all shipment refs"
 
 The final pull-and-commit matters: APEX normalises things on import, and you want Git to hold what the Builder now holds, not your pre-import text. The VS Code play button (attach connection → play icon) does the same as `push.ps1` if you prefer the GUI — save the file first, it won't import unsaved buffers.
 
-**The only way to lose work solo** is editing in *both* places without a pull in between — Builder changes made after your last pull are erased by the next push. The "pull first" habit at the top of file work eliminates it. If you do slip: the extension's Export-Before-Import snapshot (in `apex-exports/`) has the Builder version; diff, unify, re-import.
+**The only way to lose work solo** is editing in *both* places without a pull in between — Builder changes made after your last pull are erased by the next push. The "pull first" habit at the top of file work eliminates it, and the push script now enforces it: pull stamps its date into `tmp/.pulled-<app>`, and push runs `apex list -changesSince <that date>` first (a seconds-long catalog query, not an export). If the app changed in the Builder since the pull, push shows what changed and asks before importing. The check is day-granular, so a same-day push can list your own activity — read the list, then answer. For extra caution (production promotes, or before a risky replace), `push.sh -backup` / `push.ps1 -Backup` also takes a full split export of the *current* target into `tmp/backup-<app>-<timestamp>/` before importing — minutes on a big app, so it is a flag, not the default; on a clean drift check, git's last pull commit is already an importable copy of the target. If you do slip: the extension's Export-Before-Import snapshot (in `apex-exports/`) has the Builder version; diff, unify, re-import.
 
 ### Database code — two tiers, pick by project
 
