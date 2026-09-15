@@ -40,14 +40,17 @@ SQLEOF
     echo "If that was someone else (or you, in the Builder), STOP: pull,"
     echo "diff, and merge first - the import ERASES those changes."
     echo "If it is only your own pull/push activity from that day, continue."
-    read -rp "Continue push anyway? [y/N] " ans
+    # prompt echoed to stdout (not read -p) so it also shows in gui.py
+    echo -n "Continue push anyway? [y/N] "
+    read -r ans
     [[ "$ans" == y* || "$ans" == Y* ]] || { echo "push aborted." >&2; exit 1; }
   else
     echo "no Builder changes since last pull."
   fi
 else
   echo "NOTE: no pull stamp (tmp/.pulled-$APP) - cannot check Builder drift."
-  read -rp "Continue without the drift check? [y/N] " ans
+  echo -n "Continue without the drift check? [y/N] "
+  read -r ans
   [[ "$ans" == y* || "$ans" == Y* ]] || { echo "push aborted." >&2; exit 1; }
 fi
 
