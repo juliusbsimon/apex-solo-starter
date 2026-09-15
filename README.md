@@ -12,6 +12,11 @@
    Fresh machine? `./scripts/setup-prereqs.sh` (WSL/Linux) or
    `.\scripts\check-prereqs.ps1` (Windows) first.
 
+   Prefer buttons to a terminal? `python3 scripts/gui.py` serves a local
+   control panel (pull / validate / push / migrate / commit, live output);
+   `bash scripts/menu.sh` is the same as a terminal menu. Both just run the
+   scripts above — human-only, denied to agents like the scripts they call.
+
    New to Git entirely? Start with **[GETTING-STARTED.md](GETTING-STARTED.md)**.
 
    Full documentation: **[RUNBOOK.md](RUNBOOK.md)**

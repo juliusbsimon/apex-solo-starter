@@ -99,6 +99,22 @@ your laptop and can be shared. Your APEX app becomes files via this starter's
    The same list lives in RUNBOOK §2 "Setup at a glance" if the terminal
    output has scrolled away.
 
+## If you'd rather click than type
+
+Two launchers run the exact same scripts, so nothing below stops being true —
+they just save the typing:
+
+- `python3 scripts/gui.py` — starts a small control panel in your browser at
+  `http://localhost:8765`: buttons for pull, validate, push, migrations, and
+  commit-and-push, with the output streaming on the page. When a script asks
+  a question (the push safety check does), type the answer in the input line
+  at the bottom of the page.
+- `bash scripts/menu.sh` — the same choices as a numbered menu in the
+  terminal (WSL/Linux).
+
+The Git commands below are still worth learning: the launchers cover the
+daily loop, and the terminal is what's left when something unusual happens.
+
 ## The five commands that are 95% of Git
 
 Run these from the project folder. In order of how often you'll use them:
