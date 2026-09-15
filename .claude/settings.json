@@ -9,7 +9,10 @@
       "Bash(*push.sh*)",
       "Bash(*pull.sh*)",
       "Bash(*migrate.sh*)",
-      "Bash(*migrate.ps1*)"
+      "Bash(*migrate.ps1*)",
+      "Bash(*menu.sh*)",
+      "Bash(*gui.py*)"
+
     ],
     "allow": [
       "Bash(sql /nolog*)",
