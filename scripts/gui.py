@@ -156,43 +156,65 @@ PAGE = """<!doctype html><meta charset="utf-8">
 <style>
  body{font:14px system-ui;margin:0;padding:12px;background:#111;color:#ddd}
  button{margin:2px;padding:8px 14px;font-size:14px;cursor:pointer}
- #out{background:#000;color:#0f0;padding:10px;height:60vh;overflow:auto;
+ button:disabled{opacity:.35;cursor:default}
+ #out{background:#000;padding:10px;height:60vh;overflow:auto;
       white-space:pre-wrap;font:12px monospace;margin-top:10px}
- #send,#msg{width:50%%;padding:6px;font:13px monospace}
+ #out div{min-height:1em}
+ .ln{color:#9d9}.sep{color:#6cf}.err{color:#f66}.wrn{color:#fc3}.ok{color:#4f4;font-weight:bold}
+ #send,#msg{width:50%%;padding:6px;font:13px monospace;background:#000;color:#ddd;border:1px solid #444}
  .warn{color:#fa0} select{font:12px monospace;width:60%%}
+ #yn{display:none} #yn button{padding:4px 18px}
+ small.meta{color:#888;font-weight:normal}
 </style>
-<h3>%(repo)s <small class=warn id=st></small></h3>
+<h3>%(repo)s <small class=meta id=conn></small> <small class=warn id=st></small></h3>
 <div id=approw hidden style="margin-bottom:6px">
  app: <select id=appsel style="width:auto"></select>
  workspace override (only if it differs): <input id=wsin size=14>
 </div>
 <div>
- <button onclick="run('pull')">Pull</button>
- <button onclick="run('validate')">Validate</button>
- <button onclick="run('push')">Push</button>
- <button onclick="run('push-backup')">Push + backup</button>
- <button onclick="run('gitstatus')">Git status</button>
- <button onclick="run('gitdiff')">Git diff</button>
+ <button class=act onclick="run('pull')">Pull</button>
+ <button class=act onclick="run('validate')">Validate</button>
+ <button class=act onclick="run('push')">Push</button>
+ <button class=act onclick="run('push-backup')">Push + backup</button>
+ <button class=act onclick="run('gitstatus')">Git status</button>
+ <button class=act onclick="run('gitdiff')">Git diff</button>
  <button onclick="post('/stop',{})" style="color:#f66">Stop</button>
+ <button onclick="out.innerHTML='';out.appendChild(tail)" title="clears the display only">Clear</button>
 </div>
 <div style="margin-top:6px">
  <select id=migs multiple size=4></select>
  <button onclick="migs()" title="re-read db/migrations">&#8635;</button><br>
  admin conn (optional): <input id=adm size=18>
- <button onclick="migrate()">Run migration(s)</button>
+ <button class=act onclick="migrate()">Run migration(s)</button>
+ <button class=act onclick="refreshGrants()" title="promptless db/refresh-claude-ro-grants.sql as the admin conn">Refresh RO grants</button>
 </div>
 <div style="margin-top:6px">
  <input id=msg placeholder="commit message">
- <button onclick="commitpush()">Commit &amp; push to git</button>
+ <button class=act onclick="commitpush()">Commit &amp; push to git</button>
 </div>
 <div id=out></div>
 <div style="margin-top:6px">
+ <span id=yn>answer:
+  <button onclick="answer('y')" style="color:#4f4">Yes</button>
+  <button onclick="answer('n')" style="color:#f66">No</button></span>
  <input id=send placeholder="reply to a prompt here (y / N / password) then Enter">
 </div>
 <script>
-let n=0;
+let n=0,pending='',wasRunning=false,t0=0;
 const out=document.getElementById('out'), st=document.getElementById('st'),
-      send=document.getElementById('send');
+      send=document.getElementById('send'), yn=document.getElementById('yn');
+function cls(l){
+  if(/^────/.test(l))return 'sep';
+  if(/IMPORT DID NOT|error|failed|aborted|ORA-\d|PLS-\d/i.test(l))return 'err';
+  if(/warning|STOP:|NOTE:/i.test(l))return 'wrn';
+  if(/successful|^Imported\.|no Builder changes|passed/i.test(l))return 'ok';
+  return 'ln';}
+function addLine(l){const d=document.createElement('div');
+  d.className=cls(l);d.textContent=l;out.insertBefore(d,tail);}
+const tail=document.createElement('div');tail.className='ln';out.appendChild(tail);
+function feed(text){
+  pending+=text;const parts=pending.split('\n');pending=parts.pop();
+  parts.forEach(addLine);tail.textContent=pending;}
 async function post(u,b){const r=await fetch(u,{method:'POST',
   headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
   return r.json();}
@@ -212,23 +234,39 @@ async function commitpush(){
   const m=document.getElementById('msg').value.trim();
   if(!m){alert('commit message first');return;}
   const r=await post('/run',{id:'commitpush',msg:m});if(!r.ok)alert(r.err);}
-document.getElementById('send').addEventListener('keydown',async e=>{
-  if(e.key==='Enter'){await post('/send',{line:e.target.value});e.target.value='';}});
-let wasRunning=false;
+async function refreshGrants(){
+  const r=await post('/run',{id:'refresh-grants',admin:adm.value});
+  if(!r.ok)alert(r.err);}
+async function answer(a){await post('/send',{line:a});}
+// remember the admin conn across reloads (localhost page, harmless value)
+const adm=document.getElementById('adm');
+try{adm.value=localStorage.getItem('adm')||'';}catch(e){}
+adm.addEventListener('change',()=>{try{localStorage.setItem('adm',adm.value);}catch(e){}});
+send.addEventListener('keydown',async e=>{
+  if(e.key==='Enter'){await post('/send',{line:send.value});send.value='';}});
+function elapsed(){const s=Math.floor((Date.now()-t0)/1000);
+  return Math.floor(s/60)+':'+String(s%%60).padStart(2,'0');}
 async function tick(){
   const r=await (await fetch('/out?since='+n)).json();
-  if(r.next<n){n=0;out.textContent='';}   // server restarted: start over
-  if(r.chunks.length){out.textContent+=r.chunks.join('');n=r.next;
-    out.scrollTop=out.scrollHeight;}
-  if(wasRunning&&!r.running)migs();       // a run just finished: new files?
+  if(r.next<n){n=0;out.innerHTML='';out.appendChild(tail);pending='';}
+  if(r.chunks.length){
+    const nearBottom=out.scrollHeight-out.scrollTop-out.clientHeight<48;
+    feed(r.chunks.join(''));n=r.next;
+    if(nearBottom)out.scrollTop=out.scrollHeight;}
+  if(wasRunning&&!r.running)migs();
+  if(!wasRunning&&r.running)t0=Date.now();
   wasRunning=r.running;
-  // a trailing question means the script is blocked on the input line below
-  const waiting=r.running&&/\[y\/N\]\s*$/i.test(out.textContent.slice(-80));
+  const lastBits=(out.lastChild&&out.lastChild.previousSibling?
+    out.lastChild.previousSibling.textContent:'')+' '+pending;
+  const waiting=r.running&&/\[y\/N\]\s*$/i.test(lastBits.slice(-80));
+  yn.style.display=waiting?'inline':'none';
   send.style.outline=waiting?'2px solid #fa0':'';
+  if(waiting&&document.activeElement!==send)send.focus();
   send.placeholder=waiting?'the script is waiting - answer here (y / N) then Enter'
     :'reply to a prompt here (y / N / password) then Enter';
+  document.querySelectorAll('button.act').forEach(b=>b.disabled=r.running);
   st.textContent=waiting?'waiting for your answer below'
-    :r.running?('running: '+r.label)
+    :r.running?('running: '+r.label+'  '+elapsed())
     :(r.exit===null?'idle':(r.exit===0?'done (ok)':'done (EXIT '+r.exit+')'));
   setTimeout(tick,500);}
 async function migs(){const r=await (await fetch('/migrations')).json();
@@ -236,7 +274,8 @@ async function migs(){const r=await (await fetch('/migrations')).json();
   r.files.forEach(f=>{const o=document.createElement('option');
     o.value=o.textContent=f;s.appendChild(o);});}
 async function apps(){const r=await (await fetch('/apps')).json();
-  if(r.apps.length<2)return;               // single-app repo: keep it simple
+  if(r.conn)document.getElementById('conn').textContent='conn: '+r.conn;
+  if(r.apps.length<2)return;
   const row=document.getElementById('approw'),sel=document.getElementById('appsel');
   sel.innerHTML='';
   r.apps.forEach(a=>{const o=document.createElement('option');
@@ -265,7 +304,7 @@ class H(BaseHTTPRequestHandler):
                             "running": state["proc"] is not None,
                             "exit": state["exit"], "label": state["label"]})
         elif self.path.startswith("/apps"):
-            self._json({"apps": list_apps()})
+            self._json({"apps": list_apps(), "conn": default_conn()})
         elif self.path.startswith("/migrations"):
             files = sorted(os.path.basename(f) for f in
                            glob.glob(os.path.join(REPO, "db/migrations/*.sql")))
@@ -290,6 +329,14 @@ class H(BaseHTTPRequestHandler):
                     return self._json({"ok": False, "err": err})
                 label = cid + (" " + req.get("app") if req.get("app") else "")
                 ok = start(argv, label)
+            elif cid == "refresh-grants":
+                admin = (req.get("admin") or "").strip()
+                if not admin or not SAFE.match(admin):
+                    return self._json({"ok": False,
+                        "err": "enter the admin connection name first"})
+                argv = (PS + ["scripts\\refresh-ro-grants.ps1", "-Admin", admin]) \
+                    if WIN else ["bash", "scripts/refresh-ro-grants.sh", admin]
+                ok = start(argv, "refresh RO grants")
             elif cid == "migrate":
                 files, bad = [], []
                 for f in req.get("files", []):
