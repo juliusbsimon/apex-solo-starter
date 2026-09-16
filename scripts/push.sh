@@ -28,13 +28,14 @@ PULLSTAMP="$REPO/tmp/.pulled-$APP"
 if [[ -f "$PULLSTAMP" ]]; then
   SINCE="$(cat "$PULLSTAMP")"
   echo "== drift check: Builder changes since last pull ($SINCE) =="
-  DRIFT="$(sql -name "$CONN" <<SQLEOF
+  echo "   (SQLcl takes ~10s to start - output streams when it does)"
+  # tee /dev/stderr: stream live AND capture for the gate below
+  DRIFT="$(sql -name "$CONN" <<SQLEOF | tee /dev/stderr
 apex list -changesSince $SINCE
 exit
 SQLEOF
 )"
   if grep -q "$APP_ID" <<< "$DRIFT"; then
-    echo "$DRIFT"
     echo
     echo "WARNING: app $APP_ID changed in the Builder on/after $SINCE."
     echo "If that was someone else (or you, in the Builder), STOP: pull,"
@@ -87,12 +88,12 @@ fi
 # catch its failures. Success is judged from the actual output, and the
 # workspace is passed explicitly: on a schema granted to multiple
 # workspaces, an import without -workspace bails silently.
-OUT="$(sql -name "$CONN" <<SQLEOF
+echo "== importing (output streams as SQLcl produces it) =="
+OUT="$(sql -name "$CONN" <<SQLEOF | tee /dev/stderr
 apex import -input $REPO/apex/$APP -workspace __WORKSPACE__
 exit
 SQLEOF
 )"
-echo "$OUT"
 if grep -qi "import successful" <<< "$OUT"; then
   # target now equals the repo, so today becomes the new drift baseline
   date +%F > "$PULLSTAMP"
