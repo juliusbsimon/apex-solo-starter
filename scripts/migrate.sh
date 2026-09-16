@@ -47,6 +47,7 @@ echo "== refreshing read-only-account grants (no prompt) =="
 if [[ -n "$ADMIN" ]]; then
   sql -name "$ADMIN" @"$REPO/db/refresh-claude-ro-grants.sql"
 else
-  echo "NOTE: no admin connection given - run db/refresh-claude-ro-grants.sql"
-  echo "      as admin yourself, or the agent stays blind to any new tables."
+  echo "NOTE: no admin connection given - run scripts/refresh-ro-grants.sh"
+  echo "      ADMIN_CONN (or the GUI's 'Refresh RO grants' button), or the"
+  echo "      agent stays blind to any new tables."
 fi

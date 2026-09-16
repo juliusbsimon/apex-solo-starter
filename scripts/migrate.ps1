@@ -26,4 +26,4 @@ exit success
 }
 Write-Host "== refreshing CLAUDE_RO grants (no prompt) ==" -ForegroundColor Cyan
 if ($Admin) { sql -name $Admin "@$repo\db\refresh-claude-ro-grants.sql" }
-else { Write-Host "NOTE: run db\refresh-claude-ro-grants.sql as admin yourself, or the agent stays blind to new tables." -ForegroundColor Yellow }
+else { Write-Host "NOTE: no admin connection given - run scripts\refresh-ro-grants.ps1 -Admin ADMIN_CONN (or the GUI's 'Refresh RO grants' button), or the agent stays blind to new tables." -ForegroundColor Yellow }

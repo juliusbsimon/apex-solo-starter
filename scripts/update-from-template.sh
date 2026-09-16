@@ -57,7 +57,7 @@ stamp() {
 mkdir -p scripts db/migrations .claude docs templates
 STAMP_LIST=()
 for f in pull.sh push.sh apex-validate.sh ro.sh migrate.sh setup-prereqs.sh \
-         menu.sh gui.py \
+         menu.sh gui.py refresh-ro-grants.sh refresh-ro-grants.ps1 \
          pull.ps1 push.ps1 apex-validate.ps1 ro.ps1 migrate.ps1 check-prereqs.ps1; do
   [[ -f "$STARTER/scripts/$f" ]] || continue
   cp "$STARTER/scripts/$f" "scripts/$f"

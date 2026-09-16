@@ -11,7 +11,9 @@
       "Bash(*migrate.sh*)",
       "Bash(*migrate.ps1*)",
       "Bash(*menu.sh*)",
-      "Bash(*gui.py*)"
+      "Bash(*gui.py*)",
+      "Bash(*refresh-ro-grants.sh*)",
+      "Bash(*refresh-ro-grants.ps1*)"
 
     ],
     "allow": [

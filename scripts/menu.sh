@@ -19,6 +19,7 @@ while true; do
   5) Migrate     run db/migrations file(s), then refresh RO grants
   6) Git status + diff summary
   7) Commit & push to git (prompts for a message)
+  8) Refresh RO grants (promptless, needs admin conn)
   q) Quit
 MENU
   read -rp "> " choice
@@ -36,6 +37,11 @@ MENU
       else run scripts/migrate.sh "${files[@]}"; fi
       ;;
     6) run git status; run git diff --stat ;;
+    8)
+      read -rp "Admin connection: " admin
+      [[ -n "$admin" ]] || { echo "aborted"; continue; }
+      run scripts/refresh-ro-grants.sh "$admin"
+      ;;
     7)
       git status --short
       read -rp "Commit message (Enter aborts): " msg
