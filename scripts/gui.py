@@ -18,6 +18,7 @@ Access) in front, never a bare public tunnel.
 """
 import json
 import os
+import re
 import glob
 import subprocess
 import sys
@@ -28,19 +29,90 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
 HOST = "127.0.0.1"
 
-# The whole attack/typo surface: ids the page may run, nothing else.
 # On Windows the repo's PowerShell scripts are used; elsewhere the bash ones.
 WIN = os.name == "nt"
 PS = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File"]
-COMMANDS = {
-    "pull":        PS + [r"scripts\pull.ps1"]           if WIN else ["bash", "scripts/pull.sh"],
-    "validate":    PS + [r"scripts\apex-validate.ps1"]  if WIN else ["bash", "scripts/apex-validate.sh"],
-    "push":        PS + [r"scripts\push.ps1"]           if WIN else ["bash", "scripts/push.sh"],
-    "push-backup": PS + [r"scripts\push.ps1", "-Backup"] if WIN else ["bash", "scripts/push.sh", "-backup"],
-    "gitstatus":   ["git", "status"],
-    "gitdiff":     ["git", "diff", "--stat"],
-    # "migrate" and "commitpush" build their argv below, with checks
-}
+GIT_CMDS = {"gitstatus": ["git", "status"], "gitdiff": ["git", "diff", "--stat"]}
+SAFE = re.compile(r"^[A-Za-z0-9_.$#:@-]{1,128}$")
+
+
+def list_apps():
+    """Every dir under apex/, with its app id from deployments/*.json."""
+    apps = []
+    for d in sorted(glob.glob(os.path.join(REPO, "apex", "*"))):
+        if not os.path.isdir(d):
+            continue
+        app_id = None
+        for j in sorted(glob.glob(os.path.join(d, "deployments", "*.json"))):
+            try:
+                m = re.search(r'"id"\s*:\s*(\d+)', open(j).read())
+                if m:
+                    app_id = m.group(1)
+                    break
+            except OSError:
+                pass
+        apps.append({"app": os.path.basename(d), "id": app_id})
+    return apps
+
+
+def default_conn():
+    """The stamped connection name, read from the pull script."""
+    f = os.path.join(REPO, "scripts", "pull.ps1" if WIN else "pull.sh")
+    try:
+        m = re.search(r'Conn\s*=\s*"([^"]+)"' if WIN
+                      else r'CONN="\$\{1:-([^}"]+)\}"', open(f).read())
+        return m.group(1) if m else None
+    except OSError:
+        return None
+
+
+def build_cmd(cid, req):
+    """argv for pull/validate/push, honouring an app selection. Returns
+    (argv, None) or (None, error). No selection = stamped defaults."""
+    app = (req.get("app") or "").strip()
+    ws = (req.get("ws") or "").strip()
+    if not app:  # single-app path: exactly the scripts' own defaults
+        base = {"pull": "pull", "validate": "apex-validate",
+                "push": "push", "push-backup": "push"}[cid]
+        argv = (PS + ["scripts\\%s.ps1" % base]) if WIN \
+            else ["bash", "scripts/%s.sh" % base]
+        if cid == "push-backup":
+            argv.append("-Backup" if WIN else "-backup")
+        return argv, None
+    for v in (app, ws):
+        if v and not SAFE.match(v):
+            return None, "invalid characters in app/workspace"
+    if not os.path.isdir(os.path.join(REPO, "apex", app)):
+        return None, "no such app dir: apex/" + app
+    app_id = next((a["id"] for a in list_apps() if a["app"] == app), None)
+    conn = default_conn()
+    if cid == "validate":
+        return ((PS + ["scripts\\apex-validate.ps1", "-App", app]) if WIN
+                else ["bash", "scripts/apex-validate.sh", app]), None
+    if not conn:
+        return None, "could not read the stamped connection from the pull script"
+    if not app_id:
+        return None, "no app id found in apex/%s/deployments/*.json" % app
+    if cid == "pull":
+        return ((PS + ["scripts\\pull.ps1", "-Conn", conn,
+                       "-AppId", app_id, "-App", app]) if WIN
+                else ["bash", "scripts/pull.sh", conn, app_id, app]), None
+    # push / push-backup
+    if WIN:
+        argv = PS + ["scripts\\push.ps1"]
+        if cid == "push-backup":
+            argv.append("-Backup")
+        argv += ["-Conn", conn, "-App", app, "-AppId", app_id]
+        if ws:
+            argv += ["-Workspace", ws]
+    else:
+        argv = ["bash", "scripts/push.sh"]
+        if cid == "push-backup":
+            argv.append("-backup")
+        argv += [conn, app, app_id]
+        if ws:
+            argv.append(ws)
+    return argv, None
 
 state = {"proc": None, "chunks": [], "exit": None, "label": ""}
 lock = threading.Lock()
@@ -90,6 +162,10 @@ PAGE = """<!doctype html><meta charset="utf-8">
  .warn{color:#fa0} select{font:12px monospace;width:60%%}
 </style>
 <h3>%(repo)s <small class=warn id=st></small></h3>
+<div id=approw hidden style="margin-bottom:6px">
+ app: <select id=appsel style="width:auto"></select>
+ workspace override (only if it differs): <input id=wsin size=14>
+</div>
 <div>
  <button onclick="run('pull')">Pull</button>
  <button onclick="run('validate')">Validate</button>
@@ -120,7 +196,13 @@ const out=document.getElementById('out'), st=document.getElementById('st'),
 async function post(u,b){const r=await fetch(u,{method:'POST',
   headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
   return r.json();}
-async function run(id){const r=await post('/run',{id});if(!r.ok)alert(r.err);}
+function appsel(){const e=document.getElementById('appsel');
+  return e&&!e.parentElement.hidden?e.value:'';}
+async function run(id){
+  const b={id};
+  if(['pull','validate','push','push-backup'].includes(id)){
+    b.app=appsel();b.ws=document.getElementById('wsin').value;}
+  const r=await post('/run',b);if(!r.ok)alert(r.err);}
 async function migrate(){
   const files=[...document.getElementById('migs').selectedOptions].map(o=>o.value);
   if(!files.length){alert('pick migration file(s) first');return;}
@@ -153,7 +235,15 @@ async function migs(){const r=await (await fetch('/migrations')).json();
   const s=document.getElementById('migs');s.innerHTML='';
   r.files.forEach(f=>{const o=document.createElement('option');
     o.value=o.textContent=f;s.appendChild(o);});}
-migs();tick();
+async function apps(){const r=await (await fetch('/apps')).json();
+  if(r.apps.length<2)return;               // single-app repo: keep it simple
+  const row=document.getElementById('approw'),sel=document.getElementById('appsel');
+  sel.innerHTML='';
+  r.apps.forEach(a=>{const o=document.createElement('option');
+    o.value=a.app;o.textContent=a.app+(a.id?' (app '+a.id+')':' (no id!)');
+    sel.appendChild(o);});
+  row.hidden=false;}
+apps();migs();tick();
 </script>"""
 
 
@@ -174,6 +264,8 @@ class H(BaseHTTPRequestHandler):
                             "next": len(state["chunks"]),
                             "running": state["proc"] is not None,
                             "exit": state["exit"], "label": state["label"]})
+        elif self.path.startswith("/apps"):
+            self._json({"apps": list_apps()})
         elif self.path.startswith("/migrations"):
             files = sorted(os.path.basename(f) for f in
                            glob.glob(os.path.join(REPO, "db/migrations/*.sql")))
@@ -190,8 +282,14 @@ class H(BaseHTTPRequestHandler):
         req = json.loads(self.rfile.read(int(self.headers["Content-Length"] or 0)) or "{}")
         if self.path == "/run":
             cid = req.get("id", "")
-            if cid in COMMANDS:
-                ok = start(COMMANDS[cid], cid)
+            if cid in GIT_CMDS:
+                ok = start(GIT_CMDS[cid], cid)
+            elif cid in ("pull", "validate", "push", "push-backup"):
+                argv, err = build_cmd(cid, req)
+                if err:
+                    return self._json({"ok": False, "err": err})
+                label = cid + (" " + req.get("app") if req.get("app") else "")
+                ok = start(argv, label)
             elif cid == "migrate":
                 files, bad = [], []
                 for f in req.get("files", []):

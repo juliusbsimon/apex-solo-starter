@@ -10,13 +10,15 @@
    stamp (the import still validates server-side regardless). #>
 param(
   [switch]$Backup,
-  [string]$Conn = "__CONN__",
-  [string]$App  = "__APP__"
+  [string]$Conn      = "__CONN__",
+  [string]$App       = "__APP__",
+  [string]$AppId     = "__APP_ID__",
+  [string]$Workspace = "__WORKSPACE__"
 )
 $ErrorActionPreference = "Stop"
 $repo  = Split-Path -Parent $PSScriptRoot
 $path  = Join-Path $repo "apex\$App"
-$appId = "__APP_ID__"
+$appId = $AppId
 
 # ---- gate 1: drift since last pull ------------------------------------------
 # Date granularity is one day, so pushes on the pull day can list your own
@@ -79,7 +81,7 @@ if ((Test-Path $stamp) -and ((Get-Content $stamp -Raw) -eq (Get-TreeHash))) {
 # Judge success from the output, and pass the workspace explicitly (a schema
 # granted to multiple workspaces makes an unqualified import bail silently).
 $out = @"
-apex import -input $path -workspace __WORKSPACE__
+apex import -input $path -workspace $Workspace
 exit
 "@ | sql -name $Conn
 $out

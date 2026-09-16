@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # repo -> Builder. HUMAN-ONLY: this REPLACES the entire application.
 # Run pull.sh + review git diff before pushing.
-# Usage: push.sh [-backup] [CONN] [APP]
+# Usage: push.sh [-backup] [CONN] [APP] [APP_ID] [WORKSPACE]
+#   Args 2-4 matter in MULTI-APP repos (several dirs under apex/): name the
+#   app dir, its application id, and - if it differs - its workspace.
+#   No args = the stamped defaults, same as always.
 #   -backup  full split export of the CURRENT target app into tmp/ before
 #            importing (minutes on a big app; git already holds the last
 #            pulled state, so this is belt-and-braces, not required).
@@ -18,7 +21,8 @@ BACKUP=0
 if [[ "${1:-}" == "-backup" ]]; then BACKUP=1; shift; fi
 CONN="${1:-__CONN__}"
 APP="${2:-__APP__}"
-APP_ID="__APP_ID__"
+APP_ID="${3:-__APP_ID__}"
+WS="${4:-__WORKSPACE__}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # ---- gate 1: drift since last pull -----------------------------------------
@@ -90,7 +94,7 @@ fi
 # workspaces, an import without -workspace bails silently.
 echo "== importing (output streams as SQLcl produces it) =="
 OUT="$(sql -name "$CONN" <<SQLEOF | tee /dev/stderr
-apex import -input $REPO/apex/$APP -workspace __WORKSPACE__
+apex import -input $REPO/apex/$APP -workspace $WS
 exit
 SQLEOF
 )"
