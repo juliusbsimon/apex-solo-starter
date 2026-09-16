@@ -10,7 +10,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
-$ledger = Join-Path $repo "db\migrationspplied-$Conn.txt"
+$ledger = Join-Path $repo "db\migrations\applied-$Conn.txt"
 $applied = @(); if (Test-Path $ledger) { $applied = Get-Content $ledger }
 foreach ($f in $File) {
   if (-not (Test-Path $f)) { throw "no such file: $f" }
