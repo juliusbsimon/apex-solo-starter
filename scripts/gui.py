@@ -60,7 +60,10 @@ def start(argv, label):
     with lock:
         if state["proc"] is not None:
             return False
-        state["chunks"] = ["$ " + " ".join(argv) + "\n"]
+        # APPEND-ONLY: the page remembers how many chunks it has read, so
+        # resetting this list here would strand every open page at an index
+        # past the end - output would look frozen until a full reload.
+        state["chunks"].append("\n──────── $ " + " ".join(argv) + "\n")
         state["exit"] = None
         state["label"] = label
         state["proc"] = subprocess.Popen(
@@ -91,7 +94,8 @@ PAGE = """<!doctype html><meta charset="utf-8">
  <button onclick="post('/stop',{})" style="color:#f66">Stop</button>
 </div>
 <div style="margin-top:6px">
- <select id=migs multiple size=4></select><br>
+ <select id=migs multiple size=4></select>
+ <button onclick="migs()" title="re-read db/migrations">&#8635;</button><br>
  admin conn (optional): <input id=adm size=18>
  <button onclick="migrate()">Run migration(s)</button>
 </div>
@@ -121,10 +125,14 @@ async function commitpush(){
   const r=await post('/run',{id:'commitpush',msg:m});if(!r.ok)alert(r.err);}
 document.getElementById('send').addEventListener('keydown',async e=>{
   if(e.key==='Enter'){await post('/send',{line:e.target.value});e.target.value='';}});
+let wasRunning=false;
 async function tick(){
   const r=await (await fetch('/out?since='+n)).json();
+  if(r.next<n){n=0;out.textContent='';}   // server restarted: start over
   if(r.chunks.length){out.textContent+=r.chunks.join('');n=r.next;
     out.scrollTop=out.scrollHeight;}
+  if(wasRunning&&!r.running)migs();       // a run just finished: new files?
+  wasRunning=r.running;
   st.textContent=r.running?('running: '+r.label)
     :(r.exit===null?'idle':(r.exit===0?'done (ok)':'done (EXIT '+r.exit+')'));
   setTimeout(tick,500);}
@@ -210,7 +218,7 @@ class H(BaseHTTPRequestHandler):
                 with lock:
                     if state["proc"] is not None:
                         return self._json({"ok": False, "err": "something is already running"})
-                    state["chunks"] = []
+                    state["chunks"].append("\n──────── commit + push\n")
                     state["exit"] = None
                     state["label"] = "commit+push"
                     state["proc"] = True  # marks busy; seq() clears it
