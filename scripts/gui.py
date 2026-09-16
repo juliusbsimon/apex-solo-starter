@@ -47,7 +47,13 @@ lock = threading.Lock()
 
 
 def reader(proc):
-    for chunk in iter(lambda: proc.stdout.read(256), b""):
+    # bufsize=0 + os.read: return whatever bytes are available NOW.
+    # A buffered read(256) would wait for a full 256 bytes, holding short
+    # output (exactly the [y/N] prompts) invisible until the process died.
+    while True:
+        chunk = os.read(proc.stdout.fileno(), 4096)
+        if not chunk:
+            break
         with lock:
             state["chunks"].append(chunk.decode("utf-8", "replace"))
     proc.wait()
@@ -67,7 +73,7 @@ def start(argv, label):
         state["exit"] = None
         state["label"] = label
         state["proc"] = subprocess.Popen(
-            argv, cwd=REPO, stdin=subprocess.PIPE,
+            argv, cwd=REPO, stdin=subprocess.PIPE, bufsize=0,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     threading.Thread(target=reader, args=(state["proc"],), daemon=True).start()
     return True
@@ -109,7 +115,8 @@ PAGE = """<!doctype html><meta charset="utf-8">
 </div>
 <script>
 let n=0;
-const out=document.getElementById('out'), st=document.getElementById('st');
+const out=document.getElementById('out'), st=document.getElementById('st'),
+      send=document.getElementById('send');
 async function post(u,b){const r=await fetch(u,{method:'POST',
   headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
   return r.json();}
@@ -133,7 +140,13 @@ async function tick(){
     out.scrollTop=out.scrollHeight;}
   if(wasRunning&&!r.running)migs();       // a run just finished: new files?
   wasRunning=r.running;
-  st.textContent=r.running?('running: '+r.label)
+  // a trailing question means the script is blocked on the input line below
+  const waiting=r.running&&/\[y\/N\]\s*$/i.test(out.textContent.slice(-80));
+  send.style.outline=waiting?'2px solid #fa0':'';
+  send.placeholder=waiting?'the script is waiting - answer here (y / N) then Enter'
+    :'reply to a prompt here (y / N / password) then Enter';
+  st.textContent=waiting?'waiting for your answer below'
+    :r.running?('running: '+r.label)
     :(r.exit===null?'idle':(r.exit===0?'done (ok)':'done (EXIT '+r.exit+')'));
   setTimeout(tick,500);}
 async function migs(){const r=await (await fetch('/migrations')).json();
