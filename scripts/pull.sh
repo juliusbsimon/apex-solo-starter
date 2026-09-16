@@ -9,6 +9,17 @@ APP="${3:-__APP__}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STAGE="$REPO/tmp/apex-pull"
 
+# Uncommitted edits under apex/ would be OVERWRITTEN by the mirror below.
+# Iron rule 1 enforced: commit (or push) first, or say yes knowingly.
+if [[ -n "$(git -C "$REPO" status --porcelain -- "apex/$APP" 2>/dev/null)" ]]; then
+  echo "WARNING: uncommitted changes under apex/$APP - this pull will ERASE them:"
+  git -C "$REPO" status --short -- "apex/$APP"
+  echo "Commit first (or push your edits), unless you mean to discard them."
+  echo -n "Overwrite local edits with the Builder version? [y/N] "
+  read -r ans
+  [[ "$ans" == y* || "$ans" == Y* ]] || { echo "pull aborted." >&2; exit 1; }
+fi
+
 rm -rf "$STAGE"; mkdir -p "$STAGE"
 
 sql -name "$CONN" <<SQLEOF

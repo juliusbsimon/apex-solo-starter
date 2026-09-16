@@ -9,6 +9,17 @@ $repo  = Split-Path -Parent $PSScriptRoot
 # stage INSIDE the repo (tmp/ is gitignored): SQLcl export fails with
 # "'other' has different root" if stage and cwd are on different drives
 $stage = Join-Path $repo "tmp\apex-pull"
+
+# Uncommitted edits under apex\ would be OVERWRITTEN by the mirror below.
+$dirty = git -C $repo status --porcelain -- "apex/$App"
+if ($dirty) {
+  Write-Host "WARNING: uncommitted changes under apex\$App - this pull will ERASE them:" -ForegroundColor Yellow
+  git -C $repo status --short -- "apex/$App"
+  Write-Host "Commit first (or push your edits), unless you mean to discard them."
+  $ans = Read-Host "Overwrite local edits with the Builder version? [y/N]"
+  if ($ans -notmatch '^[yY]') { Write-Host "pull aborted." -ForegroundColor Red; exit 1 }
+}
+
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage | Out-Null
 
