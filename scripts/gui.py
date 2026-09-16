@@ -151,7 +151,10 @@ def start(argv, label):
     return True
 
 
-PAGE = """<!doctype html><meta charset="utf-8">
+# RAW string: the JS below contains \n and regex escapes that must reach
+# the browser verbatim - a plain """ string turns \n into a real newline
+# INSIDE a JS string literal and the whole page dies with a syntax error.
+PAGE = r"""<!doctype html><meta charset="utf-8">
 <title>apex-solo-starter</title>
 <style>
  body{font:14px system-ui;margin:0;padding:12px;background:#111;color:#ddd}
@@ -183,7 +186,8 @@ PAGE = """<!doctype html><meta charset="utf-8">
 </div>
 <div style="margin-top:6px">
  <select id=migs multiple size=4></select>
- <button onclick="migs()" title="re-read db/migrations">&#8635;</button><br>
+ <button onclick="migs()" title="re-read db/migrations (files in applied-*.txt ledgers are hidden)">&#8635;</button>
+ <small class=meta id=migmeta></small><br>
  admin conn (optional): <input id=adm size=18>
  <button class=act onclick="migrate()">Run migration(s)</button>
  <button class=act onclick="refreshGrants()" title="promptless db/refresh-claude-ro-grants.sql as the admin conn">Refresh RO grants</button>
@@ -272,7 +276,9 @@ async function tick(){
 async function migs(){const r=await (await fetch('/migrations')).json();
   const s=document.getElementById('migs');s.innerHTML='';
   r.files.forEach(f=>{const o=document.createElement('option');
-    o.value=o.textContent=f;s.appendChild(o);});}
+    o.value=o.textContent=f;s.appendChild(o);});
+  document.getElementById('migmeta').textContent=
+    r.applied?r.applied+' already applied (hidden)':'';}
 async function apps(){const r=await (await fetch('/apps')).json();
   if(r.conn)document.getElementById('conn').textContent='conn: '+r.conn;
   if(r.apps.length<2)return;
@@ -306,9 +312,16 @@ class H(BaseHTTPRequestHandler):
         elif self.path.startswith("/apps"):
             self._json({"apps": list_apps(), "conn": default_conn()})
         elif self.path.startswith("/migrations"):
+            applied = set()
+            for led in glob.glob(os.path.join(REPO, "db/migrations/applied-*.txt")):
+                try:
+                    applied.update(x.strip() for x in open(led))
+                except OSError:
+                    pass
             files = sorted(os.path.basename(f) for f in
-                           glob.glob(os.path.join(REPO, "db/migrations/*.sql")))
-            self._json({"files": files})
+                           glob.glob(os.path.join(REPO, "db/migrations/*.sql"))
+                           if os.path.basename(f) not in applied)
+            self._json({"files": files, "applied": len(applied)})
         else:
             body = (PAGE % {"repo": os.path.basename(REPO)}).encode()
             self.send_response(200)

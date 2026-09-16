@@ -16,3 +16,11 @@
   Forgetting the refresh is the most common way to make the agent
   mysteriously blind. The refresh script has NO password prompt; the prompt
   lives only in `db/create-claude-ro.sql`, the one-time creation script.
+- **Applied ledger:** each file that runs successfully is recorded in
+  `applied-<CONN>.txt` here (one ledger per connection, so dev and prod
+  histories stay separate). migrate skips files already in the ledger
+  (`-redo` / `-Redo` forces a re-run), and the GUI hides them from its
+  list. **Commit the ledger with your migration files** — it is the record
+  of what that connection's database has received. Pre-existing projects
+  start with an empty ledger: old, already-run migrations are only
+  protected once they are listed, so don't select them (as before).
