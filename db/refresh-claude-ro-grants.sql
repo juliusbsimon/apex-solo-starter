@@ -87,3 +87,6 @@ begin
   end;
 end;
 /
+
+-- one-shot script: leave SQLcl instead of parking at SQL>
+exit

@@ -65,3 +65,6 @@ end;
 --      create table t(x number);             -- fails: no privilege, quota 0
 --      delete from __WORKSPACE__.<table>;             -- fails: READ is not DML-capable
 --------------------------------------------------------------------------------
+
+-- one-shot script: leave SQLcl instead of parking at SQL>
+exit
