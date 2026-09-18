@@ -114,6 +114,49 @@ def build_cmd(cid, req):
             argv.append(ws)
     return argv, None
 
+def draft_message():
+    """Subject + body drafted from git status, in the repo's commit style
+    (feat(p53): ... / db(mig): ... / chore(apex): ...). A draft, not a
+    decision: it lands in the message box for the human to edit."""
+    # -uall: list untracked FILES, not collapsed "dir/" entries
+    out = subprocess.run(["git", "status", "--porcelain", "-uall"], cwd=REPO,
+                         stdout=subprocess.PIPE).stdout.decode()
+    pages, migs, dbf, other = [], [], [], []
+    lines = [l for l in out.splitlines() if l.strip()]
+    for l in lines:
+        st, path = l[:2].strip() or "M", l[3:].strip().strip('"')
+        m = re.search(r"apex/[^/]+/pages/p0*(\d+)(?:-([\w-]+))?\.apx$", path)
+        if m:
+            pages.append((st, m.group(1), m.group(2) or ""))
+        elif re.search(r"db/migrations/.+\.sql$", path):
+            migs.append((st, os.path.basename(path)))
+        elif path.startswith("db/"):
+            dbf.append((st, path))
+        else:
+            other.append((st, path))
+    verb = {"A": "add", "M": "update", "D": "remove", "R": "rename", "??": "add"}
+    if pages and not (migs or dbf):
+        nums = sorted({p[1] for p in pages}, key=int)
+        tag = ",".join("p" + n for n in nums[:3]) + ("..." if len(nums) > 3 else "")
+        v = verb.get(pages[0][0], "update")
+        slug = pages[0][2] if len(pages) == 1 else "%d pages" % len(nums)
+        subject = "feat(%s): %s %s" % (tag, v, slug)
+    elif migs and not pages:
+        subject = "db(mig): %s %s" % (verb.get(migs[0][0], "add"),
+                                      ", ".join(m[1] for m in migs[:2]))
+    elif dbf and not pages:
+        subject = "db: update " + ", ".join(os.path.basename(f[1]) for f in dbf[:2])
+    elif lines:
+        subject = "chore(apex): update %d files" % len(lines)
+    else:
+        return ""
+    files = ["%s %s" % (verb.get(l[:2].strip() or "M", "update"), l[3:].strip())
+             for l in lines[:12]]
+    if len(lines) > 12:
+        files.append("... and %d more" % (len(lines) - 12))
+    return subject + "\n\n" + "\n".join(files)
+
+
 state = {"proc": None, "chunks": [], "exit": None, "label": ""}
 lock = threading.Lock()
 
@@ -193,7 +236,8 @@ PAGE = r"""<!doctype html><meta charset="utf-8">
  <button class=act onclick="refreshGrants()" title="promptless db/refresh-claude-ro-grants.sql as the admin conn">Refresh RO grants</button>
 </div>
 <div style="margin-top:6px">
- <input id=msg placeholder="commit message">
+ <input id=msg placeholder="commit message (empty = draft one for me)">
+ <button onclick="draftMsg()">Draft msg</button>
  <button class=act onclick="commitpush()">Commit &amp; push to git</button>
 </div>
 <div id=out></div>
@@ -234,10 +278,19 @@ async function migrate(){
   if(!files.length){alert('pick migration file(s) first');return;}
   const r=await post('/run',{id:'migrate',files,admin:document.getElementById('adm').value});
   if(!r.ok)alert(r.err);}
+async function draftMsg(){
+  const r=await (await fetch('/draft')).json();
+  const msg=document.getElementById('msg');
+  if(!r.msg){st.textContent='nothing to commit';return false;}
+  msg.value=r.msg.split('\n')[0];msg.title=r.msg;msg.focus();
+  st.textContent='message drafted - edit if needed, then Commit & push';
+  return true;}
 async function commitpush(){
   const m=document.getElementById('msg').value.trim();
-  if(!m){alert('commit message first');return;}
-  const r=await post('/run',{id:'commitpush',msg:m});if(!r.ok)alert(r.err);}
+  if(!m){await draftMsg();return;}   // first click drafts, second commits
+  const full=document.getElementById('msg').title||'';
+  const body=(full&&full.split('\n')[0]===m)?full:m; // keep drafted body if subject untouched
+  const r=await post('/run',{id:'commitpush',msg:body});if(!r.ok)alert(r.err);}
 async function refreshGrants(){
   const r=await post('/run',{id:'refresh-grants',admin:adm.value});
   if(!r.ok)alert(r.err);}
@@ -309,6 +362,8 @@ class H(BaseHTTPRequestHandler):
                             "next": len(state["chunks"]),
                             "running": state["proc"] is not None,
                             "exit": state["exit"], "label": state["label"]})
+        elif self.path.startswith("/draft"):
+            self._json({"msg": draft_message()})
         elif self.path.startswith("/apps"):
             self._json({"apps": list_apps(), "conn": default_conn()})
         elif self.path.startswith("/migrations"):
