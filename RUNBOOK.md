@@ -42,10 +42,10 @@ Scripted: on WSL/Linux run `./scripts/setup-prereqs.sh` (installs JDK 21, git, r
      connect -save <CONN> -savepwd schema/<password>@//host:1521/service
 2. Agent read-only account (recommended): run db/create-claude-ro.sql as an
    admin user — it prompts for a password, nothing to edit — then:
-     connect -save <APP>_CLAUDE_RO -savepwd <APP>_CLAUDE_RO/<pw>@//host:1521/service
-   (per-project name: SQLcl saved connections are GLOBAL to the OS user — a
-   generic CLAUDE_RO gets silently reused by another project's ro.sh and
-   connects to the wrong database)
+     connect -save <SCHEMA>_CLAUDE_RO -savepwd <SCHEMA>_CLAUDE_RO/<pw>@//host:1521/service
+   (per-SCHEMA name, shared by every app in the schema: SQLcl saved
+   connections are GLOBAL to the OS user — a generic CLAUDE_RO gets silently
+   reused by another project's ro.sh and connects to the wrong database)
 3. Baseline:   ./scripts/pull.sh   → review → git add -A && git commit
 4. Remote:     git remote add origin <url> && git push -u origin main
 5. Determinism check: pull again → git status must be clean
@@ -147,7 +147,7 @@ git push -u origin main
 
 ### 2.5 The read-only agent account (part of standard setup)
 
-Create `CLAUDE_RO` so the agent can answer its own schema questions (does this column exist? what shape is the data?) without ever holding a key that writes. Ships alongside this runbook as `create-claude-ro.sql` — run it **as an admin user** (on RDS: the master user) — it **prompts for the password, hidden**, so there is nothing to edit in the file and nothing stored in Git. Then save the connection:
+Create the read-only account (named `<SCHEMA>_CLAUDE_RO` — the grants cover the whole parsing schema, so every app in the schema shares the one account; a project in a different schema gets its own) so the agent can answer its own schema questions (does this column exist? what shape is the data?) without ever holding a key that writes. Ships alongside this runbook as `create-claude-ro.sql` — run it **as an admin user** (on RDS: the master user) — it **prompts for the password, hidden**, so there is nothing to edit in the file and nothing stored in Git. Then save the connection:
 
 ```powershell
 # save the connection once - NAME IT PER PROJECT: saved connections are
@@ -155,7 +155,7 @@ Create `CLAUDE_RO` so the agent can answer its own schema questions (does this c
 # another project's ro.sh against the wrong database (symptom: ORA-01435
 # from the wrapper's alter session, unfamiliar schemas in all_tables)
 sql /nolog
-SQL> connect -save <app>_CLAUDE_RO -savepwd <app>_claude_ro/<password>@//host:1521/service
+SQL> connect -save <schema>_CLAUDE_RO -savepwd <schema>_claude_ro/<password>@//host:1521/service
 SQL> exit
 # scripts/ro.sh / ro.ps1 (ship alongside, stamped with the name) are the
 # agent's only door to it; the wrapper's `alter session set current_schema`
@@ -198,7 +198,7 @@ git add -A; git commit -m "chore: pre-edit sync"
 git add -A; git commit -m "refactor: rename all shipment refs"
 ```
 
-Prefer buttons to typing? Two launchers wrap these exact scripts (no logic of their own, so every gate and prompt behaves as documented): `bash scripts/menu.sh` is a numbered menu in the terminal, and `python3 scripts/gui.py` serves a one-page control panel at `http://localhost:8765` — buttons for pull/validate/push/migrate/commit, live output, and an input line for the drift prompt. The web page binds to localhost; if you expose it through a tunnel, put access control in front — anyone who reaches the page can push your app. Both launchers are human-only, same as the scripts they call (`.claude/settings.json` denies them to the agent).
+Prefer buttons to typing? Two launchers wrap these exact scripts (no logic of their own, so every gate and prompt behaves as documented): `bash scripts/menu.sh` is a numbered menu in the terminal, and `python3 scripts/gui.py` serves a one-page control panel at `http://localhost:8765` — buttons for pull/validate/push/migrate/commit, live output, and an input line for the drift prompt. A repo holding several apps under `apex/` gets an app dropdown (ids read from each app's `deployments/*.json`); pull, validate, and push then act on the selected app, and the scripts accept the same as arguments — `push.sh [-backup] [CONN] [APP] [APP_ID] [WORKSPACE]` (PowerShell: `-App`, `-AppId`, `-Workspace`). The web page binds to localhost; if you expose it through a tunnel, put access control in front — anyone who reaches the page can push your app. Both launchers are human-only, same as the scripts they call (`.claude/settings.json` denies them to the agent).
 
 The final pull-and-commit matters: APEX normalises things on import, and you want Git to hold what the Builder now holds, not your pre-import text. The VS Code play button (attach connection → play icon) does the same as `push.ps1` if you prefer the GUI — save the file first, it won't import unsaved buffers.
 

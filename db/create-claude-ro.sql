@@ -24,9 +24,11 @@ accept ro_pass_input char prompt 'Password for read-only user (Enter if user alr
 
 begin
   :app_schema := '__SCHEMA__';                  -- the app's parsing schema
-  -- per-project user: two apps sharing one database must not share one RO
-  -- account (one password, union of grants, muddied audit)
-  :ro_user    := upper('__APP___CLAUDE_RO');
+  -- per-SCHEMA user: the grants below cover the whole parsing schema, so
+  -- every app in this schema shares this one account. A different project
+  -- in a DIFFERENT schema gets its own (one password, own grants, clean
+  -- audit) - never reuse one RO account across schemas.
+  :ro_user    := upper('__SCHEMA___CLAUDE_RO');
   :ro_pass    := '&ro_pass_input';
 end;
 /

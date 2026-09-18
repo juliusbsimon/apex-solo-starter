@@ -6,7 +6,7 @@
 param(
   [string]$Query,
   [string]$File,
-  [string]$Conn = "__APP___CLAUDE_RO"  # per-project: saved names are global to the OS user
+  [string]$Conn = "__SCHEMA___CLAUDE_RO"  # per-schema: saved names are global to the OS user
 )
 if ($File) { $Query = Get-Content $File -Raw }
 if (-not $Query) { throw "usage: ro.ps1 -Query `"select ...`"  or  -File checks.sql" }

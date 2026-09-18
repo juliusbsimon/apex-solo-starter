@@ -9,7 +9,7 @@ set -euo pipefail
 command -v sql >/dev/null 2>&1 || PATH="$HOME/sqlcl/bin:$PATH"
 
 ARG="${1:?usage: ro.sh \"select ...\" | ro.sh file.sql}"
-CONN="${2:-__APP___CLAUDE_RO}"   # per-project: saved names are global to the OS user
+CONN="${2:-__SCHEMA___CLAUDE_RO}"   # per-schema: saved names are global to the OS user
 if [[ -f "$ARG" ]]; then QUERY="$(cat "$ARG")"; else QUERY="$ARG"; fi
 # ensure the last statement terminates - otherwise it misparses against `exit`
 [[ "$QUERY" =~ [\;/][[:space:]]*$ ]] || QUERY="$QUERY;"

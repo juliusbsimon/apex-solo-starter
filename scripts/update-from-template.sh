@@ -37,6 +37,9 @@ tWS="${T}WORKSPACE${T}"; tSCHEMA="${T}SCHEMA${T}"; tCONN="${T}CONN${T}"
 # ---- detect stamped values from the existing project, prompt for the rest
 APP_D="$(ls apex | head -1)"
 CONN_D="$(grep -oP 'CONN="\$\{1:-\K[^}"]*' scripts/pull.sh 2>/dev/null | head -1 || true)"
+# the RO account name this project already uses (from ro.sh's default conn) -
+# older templates stamped it from the app name; the DB user keeps its name
+RO_D="$(grep -oP 'CONN="\$\{2:-\K[^}"]*' scripts/ro.sh 2>/dev/null | head -1 || true)"
 APPID_D="$(grep -oP '"id"\s*:\s*\K[0-9]+' apex/*/deployments/default.json 2>/dev/null | head -1 || true)"
 read -rp "App dir name [${APP_D}]: " APP; APP="${APP:-$APP_D}"
 read -rp "SQLcl connection name (CASE-SENSITIVE) [${CONN_D}]: " CONN; CONN="${CONN:-$CONN_D}"
@@ -75,6 +78,15 @@ if [[ -f db/refresh-claude-ro-grants.sql ]]; then
   STAMP_LIST+=(db/refresh-claude-ro-grants.sql)
 fi
 stamp "${STAMP_LIST[@]}"
+# preserve the project's existing RO account name if it differs from the
+# freshly stamped <SCHEMA>_CLAUDE_RO (renaming the DB user is a manual act)
+RO_NAME="${SCHEMA}_CLAUDE_RO"
+if [[ -n "$RO_D" && "$RO_D" != "$RO_NAME" ]]; then
+  sed -i "s|${SCHEMA}_CLAUDE_RO|$RO_D|g" \
+    scripts/ro.sh scripts/ro.ps1 db/create-claude-ro.sql db/refresh-claude-ro-grants.sql
+  echo "  (kept this project's existing RO account name: $RO_D)"
+  RO_NAME="$RO_D"
+fi
 chmod +x scripts/*.sh
 
 # ---- add-if-missing; side-copy ONLY on a real post-stamp difference
@@ -106,7 +118,7 @@ fi
 echo
 echo "Updated. Manual follow-ups:"
 echo "  1. Merge any *.template.new files listed above, then delete them."
-echo "  2. RO connection: scripts expect '${APP}_CLAUDE_RO' (case-sensitive)."
+echo "  2. RO connection: scripts expect '$RO_NAME' (case-sensitive)."
 echo "     connmgr list shows what exists; re-save if yours differs."
 echo "  3. Review: git diff   then commit:"
 echo "     git add -A && git commit -m 'chore: update scripts from template' && git push"

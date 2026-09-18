@@ -16,7 +16,7 @@ variable ro_user    varchar2(128)
 
 begin
   :app_schema := '__SCHEMA__';                  -- the app's parsing schema
-  :ro_user    := upper('__APP___CLAUDE_RO');    -- per-project RO user
+  :ro_user    := upper('__SCHEMA___CLAUDE_RO'); -- per-SCHEMA RO user (all apps in the schema share it)
 end;
 /
 
