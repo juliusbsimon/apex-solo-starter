@@ -35,15 +35,24 @@ tAPP="${T}APP${T}"; tTITLE="${T}APP_TITLE${T}"; tID="${T}APP_ID${T}"
 tWS="${T}WORKSPACE${T}"; tSCHEMA="${T}SCHEMA${T}"; tCONN="${T}CONN${T}"
 
 # ---- detect stamped values from the existing project, prompt for the rest
-APP_D="$(ls apex | head -1)"
+# prefer an already-stamped default app (pull.sh) over alphabetical order
+APP_D="$(grep -oP 'APP="\$\{3:-\K[^}"]*' scripts/pull.sh 2>/dev/null | head -1 || true)"
+[[ -n "$APP_D" && -d "apex/$APP_D" ]] || APP_D="$(ls apex | head -1)"
 CONN_D="$(grep -oP 'CONN="\$\{1:-\K[^}"]*' scripts/pull.sh 2>/dev/null | head -1 || true)"
 # the RO account name this project already uses (from ro.sh's default conn) -
 # older templates stamped it from the app name; the DB user keeps its name
 RO_D="$(grep -oP 'CONN="\$\{2:-\K[^}"]*' scripts/ro.sh 2>/dev/null | head -1 || true)"
-APPID_D="$(grep -oP '"id"\s*:\s*\K[0-9]+' apex/*/deployments/default.json 2>/dev/null | head -1 || true)"
-read -rp "App dir name [${APP_D}]: " APP; APP="${APP:-$APP_D}"
+if [[ "$(ls apex | wc -l)" -gt 1 ]]; then
+  echo "This repo holds several apps under apex/:  $(ls apex | tr '\n' ' ')"
+  echo "The one you name here is only the NO-ARGUMENT DEFAULT - the others"
+  echo "stay reachable through the GUI's app selector and script arguments."
+fi
+read -rp "Default app dir name [${APP_D}]: " APP; APP="${APP:-$APP_D}"
+[[ -d "apex/$APP" ]] || { echo "no such dir: apex/$APP" >&2; exit 1; }
+# app id comes from the CHOSEN app's deployments, not whichever globs first
+APPID_D="$(grep -oP '"id"\s*:\s*\K[0-9]+' "apex/$APP"/deployments/*.json 2>/dev/null | head -1 || true)"
 read -rp "SQLcl connection name (CASE-SENSITIVE) [${CONN_D}]: " CONN; CONN="${CONN:-$CONN_D}"
-read -rp "DEV application id [${APPID_D}]: " APP_ID; APP_ID="${APP_ID:-$APPID_D}"
+read -rp "DEV application id of $APP [${APPID_D}]: " APP_ID; APP_ID="${APP_ID:-$APPID_D}"
 read -rp "APEX workspace name: " WS
 read -rp "Parsing schema [${WS}]: " SCHEMA; SCHEMA="${SCHEMA:-$WS}"
 [[ -n "$APP" && -n "$CONN" && -n "$APP_ID" && -n "$WS" ]] || { echo "missing values" >&2; exit 1; }
