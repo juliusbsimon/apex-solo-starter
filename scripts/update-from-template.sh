@@ -39,9 +39,13 @@ tWS="${T}WORKSPACE${T}"; tSCHEMA="${T}SCHEMA${T}"; tCONN="${T}CONN${T}"
 APP_D="$(grep -oP 'APP="\$\{3:-\K[^}"]*' scripts/pull.sh 2>/dev/null | head -1 || true)"
 [[ -n "$APP_D" && -d "apex/$APP_D" ]] || APP_D="$(ls apex | head -1)"
 CONN_D="$(grep -oP 'CONN="\$\{1:-\K[^}"]*' scripts/pull.sh 2>/dev/null | head -1 || true)"
-# the RO account name this project already uses (from ro.sh's default conn) -
-# older templates stamped it from the app name; the DB user keeps its name
-RO_D="$(grep -oP 'CONN="\$\{2:-\K[^}"]*' scripts/ro.sh 2>/dev/null | head -1 || true)"
+# TWO DIFFERENT NAMES - never conflate them:
+#   RO_CONN_D = the SAVED SQLCL CONNECTION name (ro.sh default; local, case-sensitive)
+#   RO_USER_D = the DATABASE USERNAME the grant scripts target (:ro_user)
+# They match only by convention; a project may have saved the connection
+# under a different name than the account. Each is preserved separately.
+RO_CONN_D="$(grep -oP 'CONN="\$\{2:-\K[^}"]*' scripts/ro.sh 2>/dev/null | head -1 || true)"
+RO_USER_D="$(grep -ohP "ro_user\s*:=\s*upper\('\K[^']+" db/refresh-claude-ro-grants.sql db/create-claude-ro.sql 2>/dev/null | head -1 || true)"
 if [[ "$(ls apex | wc -l)" -gt 1 ]]; then
   echo "This repo holds several apps under apex/:  $(ls apex | tr '\n' ' ')"
   echo "The one you name here is only the NO-ARGUMENT DEFAULT - the others"
@@ -87,14 +91,20 @@ if [[ -f db/refresh-claude-ro-grants.sql ]]; then
   STAMP_LIST+=(db/refresh-claude-ro-grants.sql)
 fi
 stamp "${STAMP_LIST[@]}"
-# preserve the project's existing RO account name if it differs from the
-# freshly stamped <SCHEMA>_CLAUDE_RO (renaming the DB user is a manual act)
-RO_NAME="${SCHEMA}_CLAUDE_RO"
-if [[ -n "$RO_D" && "$RO_D" != "$RO_NAME" ]]; then
-  sed -i "s|${SCHEMA}_CLAUDE_RO|$RO_D|g" \
-    scripts/ro.sh scripts/ro.ps1 db/create-claude-ro.sql db/refresh-claude-ro-grants.sql
-  echo "  (kept this project's existing RO account name: $RO_D)"
-  RO_NAME="$RO_D"
+# preserve existing names if they differ from the fresh <SCHEMA>_CLAUDE_RO
+# stamp - connection name into the ro wrappers ONLY, DB username into the
+# grant scripts ONLY (renaming either is a manual act, not the updater's)
+RO_CONN="${SCHEMA}_CLAUDE_RO"; RO_USER="${SCHEMA}_CLAUDE_RO"
+if [[ -n "$RO_CONN_D" && "$RO_CONN_D" != "$RO_CONN" ]]; then
+  sed -i "s|${SCHEMA}_CLAUDE_RO|$RO_CONN_D|g" scripts/ro.sh scripts/ro.ps1
+  echo "  (kept existing RO saved-connection name: $RO_CONN_D)"
+  RO_CONN="$RO_CONN_D"
+fi
+if [[ -n "$RO_USER_D" && "$RO_USER_D" != "$RO_USER" ]]; then
+  sed -i "s|upper('${SCHEMA}_CLAUDE_RO')|upper('$RO_USER_D')|g" \
+    db/create-claude-ro.sql db/refresh-claude-ro-grants.sql
+  echo "  (kept existing RO database username: $RO_USER_D)"
+  RO_USER="$RO_USER_D"
 fi
 chmod +x scripts/*.sh
 
@@ -127,8 +137,9 @@ fi
 echo
 echo "Updated. Manual follow-ups:"
 echo "  1. Merge any *.template.new files listed above, then delete them."
-echo "  2. RO connection: scripts expect '$RO_NAME' (case-sensitive)."
-echo "     connmgr list shows what exists; re-save if yours differs."
+echo "  2. RO saved connection: ro.sh expects '$RO_CONN' (case-sensitive;"
+echo "     connmgr list shows what exists). Grant scripts target DB user"
+echo "     '$(echo "$RO_USER" | tr a-z A-Z)' (dba_users shows what exists)."
 echo "  3. Review: git diff   then commit:"
 echo "     git add -A && git commit -m 'chore: update scripts from template' && git push"
 
