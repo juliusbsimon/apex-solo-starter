@@ -39,7 +39,7 @@ apex list -changesSince $SINCE
 exit
 SQLEOF
 )"
-  if grep -q "$APP_ID" <<< "$DRIFT"; then
+  if grep -qP "(^|\s)$APP_ID(\s|$)" <<< "$DRIFT"; then   # whole column, not a substring (10 must not match 100)
     echo
     echo "WARNING: app $APP_ID changed in the Builder on/after $SINCE."
     echo "If that was someone else (or you, in the Builder), STOP: pull,"
@@ -84,6 +84,7 @@ STAMP="$REPO/tmp/.validated-$APP"
 if [[ -f "$STAMP" ]] && [[ "$(cat "$STAMP")" == "$(tree_hash)" ]]; then
   echo "tree unchanged since last successful validation - skipping pre-validate"
 else
+  echo "== tree changed since last validation - validating before import =="
   "$REPO/scripts/apex-validate.sh" "$APP" \
     || { echo "validation failed - not importing" >&2; exit 1; }
 fi

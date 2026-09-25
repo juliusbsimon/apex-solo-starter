@@ -49,12 +49,12 @@ if [[ ${#PAGES[@]} -gt 0 ]]; then
     [[ $found -eq 1 ]] || { echo "no such page file: pages/${p}[-*].apx" >&2; exit 1; }
   done
   echo "== page-subset validation (${PAGES[*]}) - stamp will NOT be written =="
-  OUT="$(sql /nolog <<SQLEOF
+  # tee /dev/stderr: stream live (minutes on a big app) AND capture for the check
+  OUT="$(sql /nolog <<SQLEOF | tee /dev/stderr
 apex validate -input $STAGE
 exit
 SQLEOF
 )"
-  echo "$OUT"
   if grep -q "Validation successful" <<< "$OUT"; then
     echo "subset OK (a full validate or the server-side import still gates the push)"
   else
@@ -62,12 +62,13 @@ SQLEOF
     exit 1
   fi
 else
-  OUT="$(sql /nolog <<SQLEOF
+  echo "== validating the full tree ($SRC) - can take minutes on a large app =="
+  # tee /dev/stderr: stream live (minutes on a big app) AND capture for the check
+  OUT="$(sql /nolog <<SQLEOF | tee /dev/stderr
 apex validate -input $SRC
 exit
 SQLEOF
 )"
-  echo "$OUT"
   if grep -q "Validation successful" <<< "$OUT"; then
     mkdir -p "$REPO/tmp"
     find "$SRC" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1 \

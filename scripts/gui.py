@@ -457,8 +457,13 @@ class H(BaseHTTPRequestHandler):
             with lock:
                 p = state["proc"]
             if p and p.stdin:
-                p.stdin.write((req.get("line", "") + "\n").encode())
+                line = req.get("line", "")
+                p.stdin.write((line + "\n").encode())
                 p.stdin.flush()
+                # echo it like a terminal would (password-style prompts excepted),
+                # so the output no longer ends in "[y/N]" and the status moves on
+                with lock:
+                    state["chunks"].append(("*" * len(line) if len(line) > 3 else line) + "\n")
             self._json({"ok": True})
         elif self.path == "/stop":
             with lock:
