@@ -473,7 +473,49 @@ class H(BaseHTTPRequestHandler):
         pass
 
 
+class Server(ThreadingHTTPServer):
+    # HTTPServer sets SO_REUSEADDR, which on WINDOWS lets a second process
+    # bind the same port too: two launchers answer one URL at random, each
+    # with its own "one run at a time" guard - so two pushes could overlap.
+    allow_reuse_address = (os.name != "nt")
+
+    def server_bind(self):
+        if os.name == "nt":  # refuse to share the port with anything
+            import socket
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
+def repo_lock():
+    """One launcher per repo, whatever the port. An OS file lock: released
+    automatically when the process exits or crashes - no stale lock files."""
+    os.makedirs(os.path.join(REPO, "tmp"), exist_ok=True)
+    f = open(os.path.join(REPO, "tmp", ".gui.lock"), "a+")
+    try:
+        if os.name == "nt":
+            import msvcrt
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.seek(0)
+        other = f.read().strip() or "another port"
+        sys.exit("A launcher for this repo is already running (%s). "
+                 "Use that browser tab, or stop it with Ctrl+C first." % other)
+    f.seek(0); f.truncate(); f.write("http://%s:%d" % (HOST, PORT)); f.flush()
+    return f  # keep the handle open: closing it releases the lock
+
+
 if __name__ == "__main__":
+    _lock = repo_lock()
+    try:
+        srv = Server((HOST, PORT), H)
+    except OSError:
+        sys.exit("Port %d is in use - probably a launcher for ANOTHER repo. "
+                 "Start this one on a different port:  python3 scripts/gui.py %d"
+                 % (PORT, PORT + 1))
     print("apex-solo-starter launcher on http://%s:%d  (repo: %s)" % (HOST, PORT, REPO))
     print("HUMAN-ONLY. Ctrl+C stops it. See the file header before tunneling.")
-    ThreadingHTTPServer((HOST, PORT), H).serve_forever()
+    srv.serve_forever()
