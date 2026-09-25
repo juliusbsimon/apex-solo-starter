@@ -248,7 +248,7 @@ PAGE = r"""<!doctype html><meta charset="utf-8">
  <input id=send placeholder="reply to a prompt here (y / N / password) then Enter">
 </div>
 <script>
-let n=0,pending='',wasRunning=false,t0=0;
+let n=0,pending='',wasRunning=false,t0=0,lastOut=Date.now();
 const out=document.getElementById('out'), st=document.getElementById('st'),
       send=document.getElementById('send'), yn=document.getElementById('yn');
 function cls(l){
@@ -322,9 +322,14 @@ async function tick(){
   send.placeholder=waiting?'the script is waiting - answer here (y / N) then Enter'
     :'reply to a prompt here (y / N / password) then Enter';
   document.querySelectorAll('button.act').forEach(b=>b.disabled=r.running);
-  st.textContent=waiting?'waiting for your answer below'
-    :r.running?('running: '+r.label+'  '+elapsed())
-    :(r.exit===null?'idle':(r.exit===0?'done (ok)':'done (EXIT '+r.exit+')'));
+  if(r.chunks.length)lastOut=Date.now();
+  // always show the clock while a script runs, plus silence since the last
+  // output - a long quiet validate and a stuck prompt must look different
+  const quiet=Math.floor((Date.now()-lastOut)/1000);
+  const clock=r.running?('  '+elapsed()+(quiet>=15?'  (no output for '+quiet+'s)':'')):'';
+  st.textContent=(waiting?'waiting for your answer below'
+    :r.running?('running: '+r.label)
+    :(r.exit===null?'idle':(r.exit===0?'done (ok)':'done (EXIT '+r.exit+')')))+clock;
   setTimeout(tick,500);}
 async function migs(){const r=await (await fetch('/migrations')).json();
   const s=document.getElementById('migs');s.innerHTML='';
