@@ -51,7 +51,33 @@ for FILE in "${FILES[@]}"; do
   sql -name "$CONN" <<SQLEOF
 set define off
 whenever sqlerror exit failure
+variable mig_t0 varchar2(20)
+exec :mig_t0 := to_char(sysdate, 'YYYY-MM-DD HH24:MI:SS')
 @$FILE
+-- compile gate: "created with compilation errors" is only a WARNING to
+-- SQLcl, so whenever sqlerror never fires. Fail the run (and keep the file
+-- out of the ledger) if any object this migration touched has errors.
+set serveroutput on size unlimited
+declare
+    n pls_integer := 0;
+begin
+    for e in ( select e.type, e.name, e.line, e.position, e.text
+               from   user_errors e
+               join   user_objects o on o.object_name = e.name and o.object_type = e.type
+               where  e.attribute = 'ERROR'
+               and    o.last_ddl_time >= to_date(:mig_t0, 'YYYY-MM-DD HH24:MI:SS') - 1/86400
+               order  by e.type, e.name, e.sequence ) loop
+        dbms_output.put_line(e.type || ' ' || e.name || ' line ' || e.line || ':' || e.position || '  ' || e.text);
+        n := n + 1;
+    end loop;
+    if n > 0 then
+        raise_application_error(-20100, n || ' compilation error(s) in objects this migration created - NOT recorded as applied');
+    end if;
+end;
+/
+-- not fatal: dependents invalidated elsewhere in the schema by this change
+select object_type || ' ' || object_name || ' is INVALID (recompile or fix)' warning
+from   user_objects where status = 'INVALID' order by 1;
 exit success
 SQLEOF
   # record success (once) - the ledger is what keeps run-once scripts run-once
