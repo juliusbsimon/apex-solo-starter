@@ -66,6 +66,7 @@ if [[ $BACKUP -eq 1 ]]; then
   echo "== backing up current app $APP_ID to $BK (split export) =="
   sql -name "$CONN" <<SQLEOF
 whenever sqlerror exit failure
+set define off
 whenever oserror  exit failure
 apex export -applicationid $APP_ID -dir "$BK" -split -skipExportDate
 exit success
@@ -95,6 +96,7 @@ fi
 # workspaces, an import without -workspace bails silently.
 echo "== importing (output streams as SQLcl produces it) =="
 OUT="$(sql -name "$CONN" <<SQLEOF | tee /dev/stderr
+set define off
 apex import -input $REPO/apex/$APP -workspace $WS
 exit
 SQLEOF

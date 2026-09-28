@@ -55,6 +55,7 @@ if ($Backup) {
   Write-Host "== backing up current app $appId to $bk (split export) ==" -ForegroundColor Cyan
   @"
 whenever sqlerror exit failure
+set define off
 whenever oserror  exit failure
 apex export -applicationid $appId -dir "$bk" -split -skipExportDate
 exit success
@@ -81,6 +82,7 @@ if ((Test-Path $stamp) -and ((Get-Content $stamp -Raw) -eq (Get-TreeHash))) {
 # Judge success from the output, and pass the workspace explicitly (a schema
 # granted to multiple workspaces makes an unqualified import bail silently).
 $out = @"
+set define off
 apex import -input $path -workspace $Workspace
 exit
 "@ | sql -name $Conn

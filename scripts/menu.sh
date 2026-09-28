@@ -20,6 +20,7 @@ while true; do
   6) Git status + diff summary
   7) Commit & push to git (prompts for a message)
   8) Refresh RO grants (promptless, needs admin conn)
+  9) PROMOTE working copy over the main app (backup + typed confirm)
   q) Quit
 MENU
   read -rp "> " choice
@@ -37,6 +38,11 @@ MENU
       else run scripts/migrate.sh "${files[@]}"; fi
       ;;
     6) run git status; run git diff --stat ;;
+    9)
+      read -rp "Main app id to REPLACE (e.g. 102): " target
+      [[ "$target" =~ ^[0-9]+$ ]] || { echo "aborted"; continue; }
+      run scripts/promote.sh "$target"
+      ;;
     8)
       read -rp "Admin connection: " admin
       [[ -n "$admin" ]] || { echo "aborted"; continue; }

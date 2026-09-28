@@ -235,6 +235,11 @@ PAGE = r"""<!doctype html><meta charset="utf-8">
  <button class=act onclick="migrate()">Run migration(s)</button>
  <button class=act onclick="refreshGrants()" title="promptless db/refresh-claude-ro-grants.sql as the admin conn">Refresh RO grants</button>
 </div>
+<div style="margin-top:6px;padding:6px;border:1px solid #733">
+ <b style="color:#f66">Promote</b> the selected/default app (a working copy) over main app id
+ <input id=promoteTarget size=6 placeholder="e.g. 102">
+ <button class=act onclick="promote()" style="color:#f66" title="REPLACES the main app - mandatory backup, then you type the id to confirm">Promote to main&hellip;</button>
+</div>
 <div style="margin-top:6px">
  <input id=msg placeholder="commit message (empty = draft one for me)">
  <button onclick="draftMsg()">Draft msg</button>
@@ -294,6 +299,12 @@ async function commitpush(){
 async function refreshGrants(){
   const r=await post('/run',{id:'refresh-grants',admin:adm.value});
   if(!r.ok)alert(r.err);}
+async function promote(){
+  const t=document.getElementById('promoteTarget').value.trim();
+  if(!/^\d+$/.test(t)){alert('enter the MAIN app id to replace');return;}
+  if(!confirm('Promote over main app '+t+'?\n\nThis REPLACES app '+t+'. The script backs it up first and will ask you to type '+t+' again before importing.'))return;
+  const b={id:'promote',target:t,app:appsel(),ws:document.getElementById('wsin').value};
+  const r=await post('/run',b);if(!r.ok)alert(r.err);}
 async function answer(a){await post('/send',{line:a});}
 // remember the admin conn across reloads (localhost page, harmless value)
 const adm=document.getElementById('adm');
@@ -315,7 +326,7 @@ async function tick(){
   wasRunning=r.running;
   const lastBits=(out.lastChild&&out.lastChild.previousSibling?
     out.lastChild.previousSibling.textContent:'')+' '+pending;
-  const waiting=r.running&&/\[y\/N\]\s*$/i.test(lastBits.slice(-80));
+  const waiting=r.running&&/(\[y\/N\]|to confirm:)\s*$/i.test(lastBits.slice(-80));
   yn.style.display=waiting?'inline':'none';
   send.style.outline=waiting?'2px solid #fa0':'';
   if(waiting&&document.activeElement!==send)send.focus();
@@ -402,6 +413,27 @@ class H(BaseHTTPRequestHandler):
                     return self._json({"ok": False, "err": err})
                 label = cid + (" " + req.get("app") if req.get("app") else "")
                 ok = start(argv, label)
+            elif cid == "promote":
+                target = str(req.get("target", "")).strip()
+                app = (req.get("app") or "").strip()
+                ws = (req.get("ws") or "").strip()
+                if not target.isdigit():
+                    return self._json({"ok": False, "err": "main app id must be a number"})
+                for v in (app, ws):
+                    if v and not SAFE.match(v):
+                        return self._json({"ok": False, "err": "invalid characters in app/workspace"})
+                if WIN:
+                    argv = PS + ["scripts\\promote.ps1", "-Target", target]
+                    if app: argv += ["-App", app]
+                    if ws: argv += ["-Workspace", ws]
+                else:
+                    argv = ["bash", "scripts/promote.sh", target]
+                    if app or ws:
+                        conn = default_conn()
+                        if not conn:
+                            return self._json({"ok": False, "err": "could not read the stamped connection"})
+                        argv += [app or "__APP__", conn] + ([ws] if ws else [])
+                ok = start(argv, "PROMOTE over " + target)
             elif cid == "refresh-grants":
                 admin = (req.get("admin") or "").strip()
                 if not admin or not SAFE.match(admin):
@@ -468,7 +500,7 @@ class H(BaseHTTPRequestHandler):
                 # echo it like a terminal would (password-style prompts excepted),
                 # so the output no longer ends in "[y/N]" and the status moves on
                 with lock:
-                    state["chunks"].append(("*" * len(line) if len(line) > 3 else line) + "\n")
+                    state["chunks"].append(("*" * len(line) if len(line) > 3 and not line.isdigit() else line) + "\n")
             self._json({"ok": True})
         elif self.path == "/stop":
             with lock:

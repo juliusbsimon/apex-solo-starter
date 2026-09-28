@@ -13,7 +13,9 @@
       "Bash(*menu.sh*)",
       "Bash(*gui.py*)",
       "Bash(*refresh-ro-grants.sh*)",
-      "Bash(*refresh-ro-grants.ps1*)"
+      "Bash(*refresh-ro-grants.ps1*)",
+      "Bash(*promote.sh*)",
+      "Bash(*promote.ps1*)"
 
     ],
     "allow": [

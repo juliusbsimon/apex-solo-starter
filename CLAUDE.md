@@ -39,7 +39,7 @@ same time.
   `user_errors`/`all_errors` — they are silently empty for objects this
   account cannot execute, which looks like success and is not.
 - The pull, push, and **migrate** scripts (`.sh` and `.ps1`), the launchers
-  that call them (`scripts/menu.sh`, `scripts/gui.py`), `project deploy`, and
+  that call them (`scripts/menu.sh`, `scripts/gui.py`), the promote scripts, `project deploy`, and
   `project release` are human-only.
 - **Never suggest or configure SQLcl as an MCP server** (`sql -mcp`). MCP
   bypasses this repo's permission rules and would expose write-capable
