@@ -5,9 +5,12 @@
 #
 # Run FROM THE PROJECT ROOT:
 #   bash scripts/update-from-template.sh
-# or bootstrap on an old project:
-#   git clone --depth 1 https://github.com/juliusbsimon/apex-solo-starter.git /tmp/starter
-#   bash /tmp/starter/scripts/update-from-template.sh
+# It fetches a FRESH copy of the template every run (a temp clone, deleted
+# afterwards) - there is no cached copy that can go stale.
+# Old project whose script predates this? Run the latest one directly:
+#   bash <(curl -sSfL https://raw.githubusercontent.com/juliusbsimon/apex-solo-starter/main/scripts/update-from-template.sh)
+#   (NOT "curl ... | bash": the prompts read stdin, which would be the script)
+# Testing unpushed template changes: STARTER=/path/to/local/checkout bash scripts/update-from-template.sh
 #
 # File policy:
 #   OVERWRITTEN (template-owned): scripts/*.sh|*.ps1 (this script's own
@@ -24,9 +27,17 @@ set -euo pipefail
 [[ -d .git && -d apex ]] || { echo "run from the project root" >&2; exit 1; }
 SELF="update-from-template.sh"
 
-STARTER="${STARTER:-/tmp/starter}"
-if [[ ! -d "$STARTER/scripts" ]]; then
-  git clone --depth 1 https://github.com/juliusbsimon/apex-solo-starter.git "$STARTER"
+if [[ -n "${STARTER:-}" ]]; then
+  # explicit local checkout (testing unpushed changes) - used as-is, never deleted
+  [[ -d "$STARTER/scripts" ]] || { echo "STARTER=$STARTER has no scripts/ dir" >&2; exit 1; }
+  echo "using local template checkout: $STARTER"
+else
+  # always a fresh clone into a private temp dir, removed on exit (even on
+  # failure). The self-replace at the end runs before this cleanup fires.
+  STARTER="$(mktemp -d "${TMPDIR:-/tmp}/apex-starter.XXXXXX")"
+  trap 'rm -rf -- "$STARTER"' EXIT
+  git clone -q --depth 1 https://github.com/juliusbsimon/apex-solo-starter.git "$STARTER"
+  echo "template: fresh clone ($(git -C "$STARTER" log -1 --format='%h %cs %s'))"
 fi
 
 # ---- placeholder tokens built at runtime so this file never contains them
