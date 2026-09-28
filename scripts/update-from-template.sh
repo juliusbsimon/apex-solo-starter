@@ -57,8 +57,19 @@ read -rp "Default app dir name [${APP_D}]: " APP; APP="${APP:-$APP_D}"
 APPID_D="$(grep -oP '"id"\s*:\s*\K[0-9]+' "apex/$APP"/deployments/*.json 2>/dev/null | head -1 || true)"
 read -rp "SQLcl connection name (CASE-SENSITIVE) [${CONN_D}]: " CONN; CONN="${CONN:-$CONN_D}"
 read -rp "DEV application id of $APP [${APPID_D}]: " APP_ID; APP_ID="${APP_ID:-$APPID_D}"
-read -rp "APEX workspace name: " WS
-read -rp "Parsing schema [${WS}]: " SCHEMA; SCHEMA="${SCHEMA:-$WS}"
+# workspace + schema are already stamped in the project - read them back
+# (newest script layout first, then older ones; skip unstamped placeholders)
+first_stamped() { grep -v '__' | head -1; }
+WS_D="$( { grep -oP 'WS="\$\{4:-\K[^}"]+' scripts/push.sh
+           grep -ohP -- '-workspace \K[A-Za-z0-9_$#]+' scripts/push.sh scripts/pull.sh
+           grep -oP '\$Workspace\s*=\s*"\K[^"]+' scripts/push.ps1
+         } 2>/dev/null | first_stamped || true)"
+SCHEMA_D="$( { grep -oP 'current_schema\s*=\s*\K[A-Za-z0-9_$#]+' scripts/ro.sh
+               grep -ohP ":app_schema\s*:=\s*'\K[^']+" db/refresh-claude-ro-grants.sql db/create-claude-ro.sql
+             } 2>/dev/null | first_stamped || true)"
+read -rp "APEX workspace name [${WS_D}]: " WS; WS="${WS:-$WS_D}"
+SCHEMA_D="${SCHEMA_D:-$WS}"
+read -rp "Parsing schema [${SCHEMA_D}]: " SCHEMA; SCHEMA="${SCHEMA:-$SCHEMA_D}"
 [[ -n "$APP" && -n "$CONN" && -n "$APP_ID" && -n "$WS" ]] || { echo "missing values" >&2; exit 1; }
 
 stamp() {
