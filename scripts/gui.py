@@ -178,6 +178,21 @@ def reader(proc):
 
 
 def start(argv, label):
+    # a GUI newer than the project's scripts (updater copied gui.py but an
+    # OLD updater didn't know the new script) -> say so, don't show bash noise
+    script = next((a for a in argv if a.startswith("scripts")), None)
+    if script and not os.path.isfile(os.path.join(REPO, script.replace("\\", os.sep))):
+        with lock:
+            if state["proc"] is not None:
+                return False
+            state["chunks"].append("\n──────── $ " + " ".join(argv) + "\n"
+                "MISSING: " + script + " is not in this project yet.\n"
+                "Run the updater once more (it is new now and copies every\n"
+                "template script):  bash scripts/update-from-template.sh\n"
+                "then restart the GUI.\n")
+            state["exit"] = 127
+            state["label"] = label
+        return True
     with lock:
         if state["proc"] is not None:
             return False

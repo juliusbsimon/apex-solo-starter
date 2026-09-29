@@ -16,6 +16,8 @@
    control panel (pull / validate / push / migrate / commit, live output);
    `bash scripts/menu.sh` is the same as a terminal menu. Both just run the
    scripts above — human-only, denied to agents like the scripts they call.
+   Repos with several apps under `apex/` get an app dropdown in the panel
+   (ids read from each app's `deployments/*.json`).
 
    New to Git entirely? Start with **[GETTING-STARTED.md](GETTING-STARTED.md)**.
 

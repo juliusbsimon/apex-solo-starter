@@ -13,7 +13,8 @@
 # Testing unpushed template changes: STARTER=/path/to/local/checkout bash scripts/update-from-template.sh
 #
 # File policy:
-#   OVERWRITTEN (template-owned): scripts/*.sh|*.ps1 (this script's own
+#   OVERWRITTEN (template-owned): every scripts/*.sh|*.ps1|*.py in the
+#     template, discovered from the clone, not a fixed list (this script's own
 #     local copy is replaced too, but LAST and via mv — see end of file),
 #     .claude/settings.json, db/create-claude-ro.sql,
 #     db/refresh-claude-ro-grants.sql, db/migrations/README.md,
@@ -94,11 +95,15 @@ stamp() {
 # Self is replaced at the very END of this script, atomically, via mv.
 mkdir -p scripts db/migrations .claude docs templates
 STAMP_LIST=()
-for f in pull.sh push.sh apex-validate.sh ro.sh migrate.sh setup-prereqs.sh \
-         menu.sh gui.py refresh-ro-grants.sh refresh-ro-grants.ps1 promote.sh promote.ps1 \
-         pull.ps1 push.ps1 apex-validate.ps1 ro.ps1 migrate.ps1 check-prereqs.ps1; do
-  [[ -f "$STARTER/scripts/$f" ]] || continue
-  cp "$STARTER/scripts/$f" "scripts/$f"
+# EVERY top-level script the template ships, read from the fresh clone - a
+# fixed list here went stale (an old updater skipped promote.sh while still
+# copying the gui.py that calls it). New template scripts now arrive on the
+# first run, whatever version of this updater is doing the copying.
+for src in "$STARTER"/scripts/*.sh "$STARTER"/scripts/*.ps1 "$STARTER"/scripts/*.py; do
+  [[ -f "$src" ]] || continue
+  f="$(basename "$src")"
+  [[ "$f" == "$SELF" ]] && continue
+  cp "$src" "scripts/$f"
   STAMP_LIST+=("scripts/$f")
 done
 cp "$STARTER/.claude/settings.json" .claude/
