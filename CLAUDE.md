@@ -62,9 +62,12 @@ same time.
 2. **Never run a push script** (`push.sh` / `push.ps1`). An APEXlang import **replaces the entire
    application** in App Builder. You edit and validate; the human reviews
    `git diff` and pushes.
-3. **Validate before declaring done.** After any `.apx` edit:
-   `sql /nolog` then `apex validate -input apex/__APP__` — iterate until
-   `Validation successful`. Ask the human to run it if you cannot.
+3. **Validate before declaring done.** After any `.apx` edit run
+   `scripts/apex-validate.sh -changed` (PowerShell: `apex-validate.ps1 -Changed`)
+   and iterate until it passes. It checks only the pages you changed when
+   nothing else changed, so a page edit takes seconds, not minutes. After
+   an edit outside `pages/` it runs the full tree by itself. Ask the human
+   to run it if you cannot.
 4. **Never touch `apex/__APP__/.apex/apexlang.json`** — editing it breaks
    validation. It is committed, but only the export writes it.
 5. **Migration before dependent app change.** A page referencing a new column

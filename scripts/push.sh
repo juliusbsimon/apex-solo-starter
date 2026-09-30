@@ -1,24 +1,34 @@
 #!/usr/bin/env bash
 # repo -> Builder. HUMAN-ONLY: this REPLACES the entire application.
 # Run pull.sh + review git diff before pushing.
-# Usage: push.sh [-backup] [CONN] [APP] [APP_ID] [WORKSPACE]
+# Usage: push.sh [-backup] [-full] [CONN] [APP] [APP_ID] [WORKSPACE]
 #   Args 2-4 matter in MULTI-APP repos (several dirs under apex/): name the
 #   app dir, its application id, and - if it differs - its workspace.
 #   No args = the stamped defaults, same as always.
 #   -backup  full split export of the CURRENT target app into tmp/ before
 #            importing (minutes on a big app; git already holds the last
 #            pulled state, so this is belt-and-braces, not required).
+#   -full    validate the whole tree even if only pages changed.
 # Gates, in order:
 #   1. drift: `apex list -changesSince <last pull date>` - a Builder edit
 #      made after your pull would be silently erased by the import.
-#   2. validate: skipped when the tree hash matches the stamp written by
-#      the last successful apex-validate.sh run (the import still
-#      validates server-side regardless).
+#   2. validate: `apex-validate.sh -changed` - nothing if the tree matches
+#      the baseline, only the edited pages if nothing but page files
+#      changed, the full tree otherwise. The baseline is the last full
+#      validation OR the last successful import (the server validates the
+#      whole app on import, so an accepted import is a full pass).
 set -euo pipefail
 command -v sql >/dev/null 2>&1 || PATH="$HOME/sqlcl/bin:$PATH"
 
-BACKUP=0
-if [[ "${1:-}" == "-backup" ]]; then BACKUP=1; shift; fi
+BACKUP=0; FULLVAL=0
+while [[ "${1:-}" == -* ]]; do
+  case "$1" in
+    -backup) BACKUP=1 ;;
+    -full)   FULLVAL=1 ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
+  esac
+  shift
+done
 CONN="${1:-__CONN__}"
 APP="${2:-__APP__}"
 APP_ID="${3:-__APP_ID__}"
@@ -75,18 +85,18 @@ SQLEOF
     || { echo "backup export incomplete - not importing" >&2; exit 1; }
 fi
 
-# ---- gate 2: validate (cache-skip on unchanged tree) ------------------------
-tree_hash() {
-  find "$REPO/apex/$APP" -type f -print0 | sort -z \
-    | xargs -0 sha256sum | sha256sum | cut -d' ' -f1
-}
+# ---- gate 2: validate only what changed since the baseline -----------------
+# same formulas as apex-validate.sh - keep them identical
+SRC="$REPO/apex/$APP"
+tree_hash() { find "$SRC" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1; }
+manifest()  { (cd "$SRC" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum); }
 
-STAMP="$REPO/tmp/.validated-$APP"
-if [[ -f "$STAMP" ]] && [[ "$(cat "$STAMP")" == "$(tree_hash)" ]]; then
-  echo "tree unchanged since last successful validation - skipping pre-validate"
-else
-  echo "== tree changed since last validation - validating before import =="
+if [[ $FULLVAL -eq 1 ]]; then
+  echo "== -full: validating the whole tree before import =="
   "$REPO/scripts/apex-validate.sh" "$APP" \
+    || { echo "validation failed - not importing" >&2; exit 1; }
+else
+  "$REPO/scripts/apex-validate.sh" -changed "$APP" \
     || { echo "validation failed - not importing" >&2; exit 1; }
 fi
 
@@ -104,6 +114,11 @@ SQLEOF
 if grep -qi "import successful" <<< "$OUT"; then
   # target now equals the repo, so today becomes the new drift baseline
   date +%F > "$PULLSTAMP"
+  # the server validated the WHOLE app to accept it: this tree is the new
+  # baseline, so the next push only checks pages edited after this one
+  mkdir -p "$REPO/tmp"
+  tree_hash > "$REPO/tmp/.validated-$APP"
+  manifest  > "$REPO/tmp/.validated-$APP.files"
   echo "Imported. Smoke-test in the browser, then pull.sh + commit."
   echo "NOTE: the import disabled any scheduled jobs in the target app."
   echo "      Dev apps: usually fine. PRODUCTION promote: run the manual"

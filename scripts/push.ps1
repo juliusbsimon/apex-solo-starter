@@ -1,15 +1,19 @@
 <# repo -> Builder. HUMAN-ONLY: this REPLACES the entire application.
    Run pull.ps1 + review git diff before pushing.
-   Usage: push.ps1 [-Backup] [-Conn CONN] [-App APP]
+   Usage: push.ps1 [-Backup] [-Full] [-Conn CONN] [-App APP] [-AppId ID] [-Workspace WS]
      -Backup  full split export of the CURRENT target app into tmp\ before
               importing (minutes on a big app; git already holds the last
               pulled state, so this is belt-and-braces, not required).
+     -Full    validate the whole tree even if only pages changed.
    Gates: 1) drift - `apex list -changesSince <last pull date>`: a Builder
    edit made after your pull would be silently erased by the import.
-   2) validate - skipped when the tree hash matches the last validation
-   stamp (the import still validates server-side regardless). #>
+   2) validate - `apex-validate.ps1 -Changed`: nothing if the tree matches
+   the baseline, only the edited pages if nothing but page files changed,
+   the full tree otherwise. The baseline is the last full validation OR the
+   last successful import (the server validates the whole app on import). #>
 param(
   [switch]$Backup,
+  [switch]$Full,
   [string]$Conn      = "__CONN__",
   [string]$App       = "__APP__",
   [string]$AppId     = "__APP_ID__",
@@ -65,19 +69,29 @@ exit success
   }
 }
 
-# ---- gate 2: validate (cache-skip on unchanged tree) --------------------------
+# ---- gate 2: validate only what changed since the baseline --------------------
+# same formulas as apex-validate.ps1 - keep them identical
 function Get-TreeHash {
   $c = (Get-ChildItem $path -Recurse -File | Sort-Object FullName |
         ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash + "|" + $_.FullName }) -join "`n"
   (Get-FileHash -Algorithm SHA256 -InputStream ([IO.MemoryStream][Text.Encoding]::UTF8.GetBytes($c))).Hash
 }
-$stamp = Join-Path $repo "tmp\.validated-$App"
-if ((Test-Path $stamp) -and ((Get-Content $stamp -Raw) -eq (Get-TreeHash))) {
-  Write-Host "tree unchanged since last successful validation - skipping pre-validate" -ForegroundColor Green
-} else {
-  & (Join-Path $PSScriptRoot "apex-validate.ps1") -App $App
-  if ($LASTEXITCODE -ne 0) { throw "validation failed - not importing" }
+function Get-Manifest {
+  $root = (Resolve-Path $path).Path.TrimEnd('\') + '\'
+  $lines = Get-ChildItem $path -Recurse -File | ForEach-Object {
+    $rel = './' + $_.FullName.Substring($root.Length).Replace('\', '/')
+    (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $rel
+  }
+  [string[]]$arr = @($lines); [Array]::Sort($arr, [StringComparer]::Ordinal); $arr
 }
+$validator = Join-Path $PSScriptRoot "apex-validate.ps1"
+if ($Full) {
+  Write-Host "== -Full: validating the whole tree before import ==" -ForegroundColor Cyan
+  & $validator -App $App
+} else {
+  & $validator -Changed -App $App
+}
+if ($LASTEXITCODE -ne 0) { throw "validation failed - not importing" }
 # `apex` is a SQLcl command, not SQL - exit codes don't reflect its failures.
 # Judge success from the output, and pass the workspace explicitly (a schema
 # granted to multiple workspaces makes an unqualified import bail silently).
@@ -90,6 +104,11 @@ $out
 if ($out -match '(?i)import successful') {
   # target now equals the repo, so today becomes the new drift baseline
   Get-Date -Format "yyyy-MM-dd" | Set-Content $pullStamp
+  # the server validated the WHOLE app to accept it: this tree is the new
+  # baseline, so the next push only checks pages edited after this one
+  New-Item -ItemType Directory -Force -Path (Join-Path $repo "tmp") | Out-Null
+  Get-TreeHash | Set-Content (Join-Path $repo "tmp\.validated-$App") -NoNewline
+  Get-Manifest | Set-Content (Join-Path $repo "tmp\.validated-$App.files")
   Write-Host "Imported. Smoke-test in the browser, then pull.ps1 + commit." -ForegroundColor Green
   Write-Host "NOTE: the import disabled any scheduled jobs in the target app." -ForegroundColor Yellow
   Write-Host "      Dev apps: usually fine. PRODUCTION promote: run the manual" -ForegroundColor Yellow

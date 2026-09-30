@@ -13,7 +13,7 @@ while true; do
   cat <<MENU
 =========== $(basename "$REPO") ===========
   1) Pull        Builder -> repo (do this before editing)
-  2) Validate    check the APEXlang tree
+  2) Validate    only what changed since the last good tree (v = whole tree)
   3) Push        repo -> Builder (drift check + validate + import)
   4) Push+Backup same, with a full export of the current app first
   5) Migrate     run db/migrations file(s), then refresh RO grants
@@ -26,7 +26,8 @@ MENU
   read -rp "> " choice
   case "$choice" in
     1) run scripts/pull.sh ;;
-    2) run scripts/apex-validate.sh ;;
+    2) run scripts/apex-validate.sh -changed ;;
+    v|V) run scripts/apex-validate.sh ;;
     3) run scripts/push.sh ;;
     4) run scripts/push.sh -backup ;;
     5)

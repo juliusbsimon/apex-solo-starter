@@ -74,11 +74,14 @@ def build_cmd(cid, req):
     ws = (req.get("ws") or "").strip()
     if not app:  # single-app path: exactly the scripts' own defaults
         base = {"pull": "pull", "validate": "apex-validate",
+                "validate-all": "apex-validate",
                 "push": "push", "push-backup": "push"}[cid]
         argv = (PS + ["scripts\\%s.ps1" % base]) if WIN \
             else ["bash", "scripts/%s.sh" % base]
         if cid == "push-backup":
             argv.append("-Backup" if WIN else "-backup")
+        if cid == "validate":  # only what changed since the last good tree
+            argv.append("-Changed" if WIN else "-changed")
         return argv, None
     for v in (app, ws):
         if v and not SAFE.match(v):
@@ -87,9 +90,11 @@ def build_cmd(cid, req):
         return None, "no such app dir: apex/" + app
     app_id = next((a["id"] for a in list_apps() if a["app"] == app), None)
     conn = default_conn()
-    if cid == "validate":
-        return ((PS + ["scripts\\apex-validate.ps1", "-App", app]) if WIN
-                else ["bash", "scripts/apex-validate.sh", app]), None
+    if cid in ("validate", "validate-all"):
+        ch = cid == "validate"
+        return ((PS + ["scripts\\apex-validate.ps1", "-App", app] + (["-Changed"] if ch else []))
+                if WIN else
+                ["bash", "scripts/apex-validate.sh"] + (["-changed"] if ch else []) + [app]), None
     if not conn:
         return None, "could not read the stamped connection from the pull script"
     if not app_id:
@@ -253,7 +258,8 @@ PAGE = r"""<!doctype html><meta charset="utf-8">
 </div>
 <div>
  <button class=act onclick="run('pull')">Pull</button>
- <button class=act onclick="run('validate')">Validate</button>
+ <button class=act onclick="run('validate')" title="only what changed since the last full validation or successful push - seconds for a page edit">Validate changed</button>
+ <button class=act onclick="run('validate-all')" title="the whole tree - minutes on a big app; refreshes the baseline">Validate all</button>
  <button class=act onclick="run('push')">Push</button>
  <button class=act onclick="run('push-backup')">Push + backup</button>
  <button class=act onclick="run('gitstatus')">Git status</button>
@@ -309,7 +315,7 @@ function appsel(){const e=document.getElementById('appsel');
   return e&&!e.parentElement.hidden?e.value:'';}
 async function run(id){
   const b={id};
-  if(['pull','validate','push','push-backup'].includes(id)){
+  if(['pull','validate','validate-all','push','push-backup'].includes(id)){
     b.app=appsel();b.ws=document.getElementById('wsin').value;}
   const r=await post('/run',b);if(!r.ok)alert(r.err);}
 async function migrate(){
@@ -441,7 +447,7 @@ class H(BaseHTTPRequestHandler):
             cid = req.get("id", "")
             if cid in GIT_CMDS:
                 ok = start(GIT_CMDS[cid], cid)
-            elif cid in ("pull", "validate", "push", "push-backup"):
+            elif cid in ("pull", "validate", "validate-all", "push", "push-backup"):
                 argv, err = build_cmd(cid, req)
                 if err:
                     return self._json({"ok": False, "err": err})
