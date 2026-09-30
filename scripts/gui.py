@@ -16,6 +16,7 @@ tunnel: `cloudflared tunnel --url http://localhost:8765`), anyone who
 reaches the URL can PUSH YOUR APP - put access control (Cloudflare
 Access) in front, never a bare public tunnel.
 """
+import codecs
 import json
 import os
 import re
@@ -157,6 +158,9 @@ def draft_message():
     return subject + "\n\n" + "\n".join(files)
 
 
+# terminal escape codes: colours/bold (CSI ... letter) and titles (OSC ... BEL)
+ANSI = re.compile(r"\x1b(?:\[[0-9;?]*[ -/]*[@-~]|\][^\x07]*\x07|[@-Z\\-_])")
+
 state = {"proc": None, "chunks": [], "exit": None, "label": ""}
 lock = threading.Lock()
 
@@ -165,12 +169,27 @@ def reader(proc):
     # bufsize=0 + os.read: return whatever bytes are available NOW.
     # A buffered read(256) would wait for a full 256 bytes, holding short
     # output (exactly the [y/N] prompts) invisible until the process died.
+    # SQLcl prints column headings wrapped in terminal escape codes
+    # (ESC[1m bold ... ESC[m). A browser shows those as junk like
+    # "[1mTABLE_NAME[m", so they are stripped here. An escape code or a
+    # multi-byte character can be split across two reads, so the decoder
+    # is incremental and an unfinished escape waits for the next read.
+    dec = codecs.getincrementaldecoder("utf-8")("replace")
+    carry = ""
     while True:
         chunk = os.read(proc.stdout.fileno(), 4096)
+        text = carry + dec.decode(chunk, final=not chunk)
+        carry = ""
+        if chunk:
+            esc = text.rfind("\x1b")
+            if esc != -1 and not ANSI.match(text, esc) and len(text) - esc < 32:
+                text, carry = text[:esc], text[esc:]
+        text = ANSI.sub("", text)
+        if text:
+            with lock:
+                state["chunks"].append(text)
         if not chunk:
             break
-        with lock:
-            state["chunks"].append(chunk.decode("utf-8", "replace"))
     proc.wait()
     with lock:
         state["exit"] = proc.returncode

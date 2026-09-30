@@ -8,3 +8,4 @@ Thumbs.db
 *:Zone.Identifier
 Desktop.ini
 # NOTE: apex/**/.apex/apexlang.json is NOT ignored - it must be committed.
+__pycache__/
