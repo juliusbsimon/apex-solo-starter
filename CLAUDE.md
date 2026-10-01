@@ -123,6 +123,27 @@ same time.
 - Exception handlers that log **re-raise** unless the swallow is explicit
   and commented — `when others then null;` is never acceptable bare.
 
+## Context persistence
+
+A session transcript is not memory. It ends, and a compaction summary keeps
+only part of it. Anything the next session needs goes in one of these places
+before you stop. Never point a tracker or a note at a transcript or summary.
+
+| What | Where |
+|---|---|
+| Pending work: the outcome, the next action, what it waits on | The human's task tracker. If the session started with an open-task list (a SessionStart hook, a Work Hub task), update that task. With no tracker, end by telling the human the next action in one sentence. |
+| An APEXlang quirk learned from a validation failure | `docs/apexlang-notes.md` |
+| A rule or landmine for this repo | Propose a line for this file; the human approves it |
+| Why a change was made | The commit message body |
+
+After a resume or a compaction, check the state yourself instead of trusting
+the summary: `git status`, `git log --oneline -5`, and the open task if there
+is one. Two more places hold workflow state.
+`db/migrations/applied-<CONN>.txt` lists the migrations each database has
+already received, and it is committed. `tmp/.pulled-<app>` (date of the last
+pull or push) and `tmp/.validated-<app>` (the last good tree) are local
+only: `tmp/` is not committed, so a fresh clone starts without them.
+
 ## Commit style
 
 `feat(p53): …` · `fix(lov): …` · `db(pkg): …` · `chore(apex): …` — feature
