@@ -19,6 +19,8 @@
 #     .claude/settings.json, db/create-claude-ro.sql,
 #     db/refresh-claude-ro-grants.sql, db/migrations/README.md,
 #     RUNBOOK.md, GETTING-STARTED.md
+#   RECORDED: .template-version (the template commit this project matches;
+#     pull/push/the GUI compare it with the template and say when it's behind)
 #   ADDED IF MISSING: scripts/prod-promote/*, templates/README.md,
 #     docs/apexlang-notes.md, CLAUDE.md
 #   NEVER CLOBBERED: existing CLAUDE.md / notes / prod-promote scripts -
@@ -47,6 +49,8 @@ tAPP="${T}APP${T}"; tTITLE="${T}APP_TITLE${T}"; tID="${T}APP_ID${T}"
 tWS="${T}WORKSPACE${T}"; tSCHEMA="${T}SCHEMA${T}"; tCONN="${T}CONN${T}"
 
 # ---- detect stamped values from the existing project, prompt for the rest
+# (prompts via printf + read, not read -p: read -p only shows its prompt on
+# a terminal, so the GUI's Update button would wait on an invisible prompt)
 # prefer an already-stamped default app (pull.sh) over alphabetical order
 APP_D="$(grep -oP 'APP="\$\{3:-\K[^}"]*' scripts/pull.sh 2>/dev/null | head -1 || true)"
 [[ -n "$APP_D" && -d "apex/$APP_D" ]] || APP_D="$(ls apex | head -1)"
@@ -63,12 +67,12 @@ if [[ "$(ls apex | wc -l)" -gt 1 ]]; then
   echo "The one you name here is only the NO-ARGUMENT DEFAULT - the others"
   echo "stay reachable through the GUI's app selector and script arguments."
 fi
-read -rp "Default app dir name [${APP_D}]: " APP; APP="${APP:-$APP_D}"
+printf %s "Default app dir name [${APP_D}]: "; read -r APP; APP="${APP:-$APP_D}"
 [[ -d "apex/$APP" ]] || { echo "no such dir: apex/$APP" >&2; exit 1; }
 # app id comes from the CHOSEN app's deployments, not whichever globs first
 APPID_D="$(grep -oP '"id"\s*:\s*\K[0-9]+' "apex/$APP"/deployments/*.json 2>/dev/null | head -1 || true)"
-read -rp "SQLcl connection name (CASE-SENSITIVE) [${CONN_D}]: " CONN; CONN="${CONN:-$CONN_D}"
-read -rp "DEV application id of $APP [${APPID_D}]: " APP_ID; APP_ID="${APP_ID:-$APPID_D}"
+printf %s "SQLcl connection name (CASE-SENSITIVE) [${CONN_D}]: "; read -r CONN; CONN="${CONN:-$CONN_D}"
+printf %s "DEV application id of $APP [${APPID_D}]: "; read -r APP_ID; APP_ID="${APP_ID:-$APPID_D}"
 # workspace + schema are already stamped in the project - read them back
 # (newest script layout first, then older ones; skip unstamped placeholders)
 first_stamped() { grep -v '__' | head -1; }
@@ -79,9 +83,9 @@ WS_D="$( { grep -oP 'WS="\$\{4:-\K[^}"]+' scripts/push.sh
 SCHEMA_D="$( { grep -oP 'current_schema\s*=\s*\K[A-Za-z0-9_$#]+' scripts/ro.sh
                grep -ohP ":app_schema\s*:=\s*'\K[^']+" db/refresh-claude-ro-grants.sql db/create-claude-ro.sql
              } 2>/dev/null | first_stamped || true)"
-read -rp "APEX workspace name [${WS_D}]: " WS; WS="${WS:-$WS_D}"
+printf %s "APEX workspace name [${WS_D}]: "; read -r WS; WS="${WS:-$WS_D}"
 SCHEMA_D="${SCHEMA_D:-$WS}"
-read -rp "Parsing schema [${SCHEMA_D}]: " SCHEMA; SCHEMA="${SCHEMA:-$SCHEMA_D}"
+printf %s "Parsing schema [${SCHEMA_D}]: "; read -r SCHEMA; SCHEMA="${SCHEMA:-$SCHEMA_D}"
 [[ -n "$APP" && -n "$CONN" && -n "$APP_ID" && -n "$WS" ]] || { echo "missing values" >&2; exit 1; }
 
 stamp() {
@@ -155,6 +159,11 @@ side "$STARTER/scripts/prod-promote/20-enable-rest-sync.sql" scripts/prod-promot
 side "$STARTER/templates/README.md" templates/README.md
 side "$STARTER/docs/apexlang-notes.md" docs/apexlang-notes.md
 side "$STARTER/CLAUDE.md" CLAUDE.md
+
+# ---- record which template commit this project now matches (committed, so
+# every clone knows; template-check.sh compares it with the template's main)
+echo "$(git -C "$STARTER" rev-parse HEAD) $(git -C "$STARTER" log -1 --format=%cs) apex-solo-starter" > .template-version
+mkdir -p tmp && rm -f tmp/.template-check   # the next check re-reads the template
 
 # ---- verify (tokens built at runtime; self excluded from the sweep)
 if grep -rn "$tAPP\|$tCONN\|$tWS\|$tSCHEMA\|$tID" scripts db RUNBOOK.md 2>/dev/null \

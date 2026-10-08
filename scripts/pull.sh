@@ -7,6 +7,8 @@ CONN="${1:-__CONN__}"
 APP_ID="${2:-__APP_ID__}"
 APP="${3:-__APP__}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+bash "$REPO/scripts/template-check.sh" 2>/dev/null || true   # one line if the template has updates; never blocks
 STAGE="$REPO/tmp/apex-pull"
 
 # Uncommitted edits under apex/ would be OVERWRITTEN by the mirror below.

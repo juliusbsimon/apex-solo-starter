@@ -35,6 +35,8 @@ APP_ID="${3:-__APP_ID__}"
 WS="${4:-__WORKSPACE__}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+bash "$REPO/scripts/template-check.sh" 2>/dev/null || true   # one line if the template has updates; never blocks
+
 # ---- gate 1: drift since last pull -----------------------------------------
 # Date granularity is one day, so pushes on the pull day can list your own
 # activity - that is why this asks instead of refusing outright.

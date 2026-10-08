@@ -21,6 +21,8 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $repo  = Split-Path -Parent $PSScriptRoot
+
+& (Join-Path $PSScriptRoot "template-check.ps1")   # one line if the template has updates; never blocks
 $path  = Join-Path $repo "apex\$App"
 $appId = $AppId
 

@@ -33,6 +33,20 @@ HOST = "127.0.0.1"
 # On Windows the repo's PowerShell scripts are used; elsewhere the bash ones.
 WIN = os.name == "nt"
 PS = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File"]
+def template_status():
+    """The one-line notice from template-check.sh/.ps1 ('' when current).
+    Same script pull/push run, so the GUI and the terminal always agree."""
+    argv = (PS + ["scripts\\template-check.ps1"]) if WIN \
+        else ["bash", "scripts/template-check.sh"]
+    if not os.path.isfile(os.path.join(REPO, argv[-1].replace("\\", os.sep))):
+        return ""
+    try:
+        r = subprocess.run(argv, cwd=REPO, capture_output=True, timeout=15)
+        return r.stdout.decode("utf-8", "replace").strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
 GIT_CMDS = {"gitstatus": ["git", "status"], "gitdiff": ["git", "diff", "--stat"]}
 SAFE = re.compile(r"^[A-Za-z0-9_.$#:@-]{1,128}$")
 
@@ -252,6 +266,10 @@ PAGE = r"""<!doctype html><meta charset="utf-8">
  small.meta{color:#888;font-weight:normal}
 </style>
 <h3>%(repo)s <small class=meta id=conn></small> <small class=warn id=st></small></h3>
+<div id=tpl hidden style="margin-bottom:6px;padding:6px;border:1px solid #a70;color:#fa0">
+ <span id=tplmsg></span>
+ <button class=act id=tplbtn hidden onclick="run('template-update')" title="runs scripts/update-from-template.sh here; prompts appear below with the project's values as defaults (Enter keeps them)">Update from template</button>
+</div>
 <div id=approw hidden style="margin-bottom:6px">
  app: <select id=appsel style="width:auto"></select>
  workspace override (only if it differs): <input id=wsin size=14>
@@ -361,12 +379,12 @@ async function tick(){
     const nearBottom=out.scrollHeight-out.scrollTop-out.clientHeight<48;
     feed(r.chunks.join(''));n=r.next;
     if(nearBottom)out.scrollTop=out.scrollHeight;}
-  if(wasRunning&&!r.running)migs();
+  if(wasRunning&&!r.running){migs();tpl();}
   if(!wasRunning&&r.running)t0=Date.now();
   wasRunning=r.running;
   const lastBits=(out.lastChild&&out.lastChild.previousSibling?
     out.lastChild.previousSibling.textContent:'')+' '+pending;
-  const waiting=r.running&&/(\[y\/N\]|to confirm:)\s*$/i.test(lastBits.slice(-80));
+  const waiting=r.running&&/(\[y\/N\]|to confirm:|\]:)\s*$/i.test(lastBits.slice(-80));
   yn.style.display=waiting?'inline':'none';
   send.style.outline=waiting?'2px solid #fa0':'';
   if(waiting&&document.activeElement!==send)send.focus();
@@ -397,7 +415,11 @@ async function apps(){const r=await (await fetch('/apps')).json();
     o.value=a.app;o.textContent=a.app+(a.id?' (app '+a.id+')':' (no id!)');
     sel.appendChild(o);});
   row.hidden=false;}
-apps();migs();tick();
+async function tpl(){try{const r=await (await fetch('/template')).json();
+  document.getElementById('tpl').hidden=!r.line;
+  document.getElementById('tplmsg').textContent=r.line;
+  document.getElementById('tplbtn').hidden=!(r.line&&r.canUpdate);}catch(e){}}
+apps();migs();tpl();tick();
 </script>"""
 
 
@@ -420,6 +442,8 @@ class H(BaseHTTPRequestHandler):
                             "exit": state["exit"], "label": state["label"]})
         elif self.path.startswith("/draft"):
             self._json({"msg": draft_message()})
+        elif self.path.startswith("/template"):
+            self._json({"line": template_status(), "canUpdate": not WIN})
         elif self.path.startswith("/apps"):
             self._json({"apps": list_apps(), "conn": default_conn()})
         elif self.path.startswith("/migrations"):
@@ -447,6 +471,13 @@ class H(BaseHTTPRequestHandler):
             cid = req.get("id", "")
             if cid in GIT_CMDS:
                 ok = start(GIT_CMDS[cid], cid)
+            elif cid == "template-update":
+                if WIN:
+                    return self._json({"ok": False, "err": "run bash scripts/update-from-template.sh from WSL or Git Bash"})
+                ok = start(["bash", "scripts/update-from-template.sh"], "update from template")
+                if ok:
+                    with lock:
+                        state["chunks"].append("(when it finishes: review git diff, commit, then RESTART this GUI to load the new gui.py)\n")
             elif cid in ("pull", "validate", "validate-all", "push", "push-backup"):
                 argv, err = build_cmd(cid, req)
                 if err:

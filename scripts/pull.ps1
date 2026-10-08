@@ -6,6 +6,8 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $repo  = Split-Path -Parent $PSScriptRoot
+
+& (Join-Path $PSScriptRoot "template-check.ps1")   # one line if the template has updates; never blocks
 # stage INSIDE the repo (tmp/ is gitignored): SQLcl export fails with
 # "'other' has different root" if stage and cwd are on different drives
 $stage = Join-Path $repo "tmp\apex-pull"

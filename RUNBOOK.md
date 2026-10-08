@@ -11,6 +11,8 @@ adds new pieces, side-copies anything you may have customized as
 copy of the script is too old to do that: run the latest one directly,
 `bash <(curl -sSfL https://raw.githubusercontent.com/juliusbsimon/apex-solo-starter/main/scripts/update-from-template.sh)`.
 
+**Knowing when to update:** the updater records the template commit the project now matches in `.template-version` (commit it). Pull, push and the GUI then compare it with the template's latest commit (`git ls-remote`, at most once a day, cached in `tmp/.template-check`) and print one line when the project is behind, for example `TEMPLATE: update available (yours ca8ead2, latest f289bfe)`. The GUI shows it as a banner with an **Update from template** button (WSL/Linux; on Windows run the updater from WSL or Git Bash). The check never blocks or fails a pull or push: offline, it says nothing. A project that has never run the new updater says its version is unknown until it runs it once.
+
 **Windows and Linux/WSL:** every script ships in both forms — `scripts/*.ps1` and `scripts/*.sh` (bash). The workflow is identical; examples below show PowerShell, substitute `./scripts/pull.sh` etc. on WSL. Two WSL notes: install SQLcl *inside* WSL (its saved-connection store is per-OS-user, so `connect -save` must be run there even if a Windows SQLcl exists), and keep the repo on the WSL filesystem (`~/dev/...`) rather than `/mnt/c/...` for git and rsync speed.
 
 **Placeholders used throughout:** `<app>` (short lowercase name, e.g. `timesheets`) · `<APP_ID>` (DEV application id) · `<CONN>` (saved SQLcl connection, e.g. `TIMESHEETS_DEV`).
