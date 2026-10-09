@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # repo -> Builder. HUMAN-ONLY: this REPLACES the entire application.
 # Run pull.sh + review git diff before pushing.
-# Usage: push.sh [-backup] [-full] [CONN] [APP] [APP_ID] [WORKSPACE]
+# Usage: push.sh [-backup] [-full] [-supporting-objects] [CONN] [APP] [APP_ID] [WORKSPACE]
 #   Args 2-4 matter in MULTI-APP repos (several dirs under apex/): name the
 #   app dir, its application id, and - if it differs - its workspace.
 #   No args = the stamped defaults, same as always.
@@ -9,6 +9,12 @@
 #            importing (minutes on a big app; git already holds the last
 #            pulled state, so this is belt-and-braces, not required).
 #   -full    validate the whole tree even if only pages changed.
+#   -supporting-objects
+#            also run the app's supporting-object scripts
+#            (apex/<APP>/supporting-objects/) in the import session. Off by
+#            default: some apps carry full schema install scripts there. It
+#            lists the scripts and asks first. See docs/apexlang-notes.md,
+#            "Supporting objects".
 # Gates, in order:
 #   1. drift: `apex list -changesSince <last pull date>` - a Builder edit
 #      made after your pull would be silently erased by the import.
@@ -20,11 +26,12 @@
 set -euo pipefail
 command -v sql >/dev/null 2>&1 || PATH="$HOME/sqlcl/bin:$PATH"
 
-BACKUP=0; FULLVAL=0
+BACKUP=0; FULLVAL=0; SUPOBJ=0
 while [[ "${1:-}" == -* ]]; do
   case "$1" in
     -backup) BACKUP=1 ;;
     -full)   FULLVAL=1 ;;
+    -supporting-objects) SUPOBJ=1 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
   shift
@@ -102,6 +109,36 @@ else
     || { echo "validation failed - not importing" >&2; exit 1; }
 fi
 
+# ---- optional: supporting-object scripts ------------------------------------
+# `apex import` never runs them by itself; they run only when the SAME SQLcl
+# session first calls set_auto_install_sup_obj(true). Opt-in on purpose.
+SO="$SRC/supporting-objects"
+SUPOBJ_SQL=""
+if [[ -d "$SO" ]]; then
+  if [[ $SUPOBJ -eq 1 ]]; then
+    echo "== supporting objects: these scripts will run in the app's schema, after the import =="
+    found=0
+    for f in "$SO"/install-scripts/*.sql "$SO"/upgrade-scripts/*.sql; do
+      [[ -f "$f" ]] && { echo "   ${f#"$SO"/}"; found=1; }
+    done
+    [[ $found -eq 1 ]] || echo "   (no .sql files found - APEX may still run inline scripts from the .apx files)"
+    if grep -q "upgradeWhenSqlQuery" "$SO/supporting-objects.apx" 2>/dev/null; then
+      echo "   NOTE: supporting-objects.apx has an upgrade query. If it returns a row, the"
+      echo "   UPGRADE scripts run and the install scripts do not - even for a new app."
+    fi
+    echo "   They run on every push with this option, so they must be safe to run again."
+    echo "   A failing statement is skipped SILENTLY and the import still says it succeeded."
+    echo -n "Run these supporting-object scripts? [y/N] "
+    read -r ans
+    [[ "$ans" == y* || "$ans" == Y* ]] || { echo "push aborted (push again without -supporting-objects to skip them)." >&2; exit 1; }
+    SUPOBJ_SQL="exec apex_application_install.set_auto_install_sup_obj(p_auto_install_sup_obj => true)"
+  else
+    echo "NOTE: apex/$APP has supporting-object scripts; they will NOT run (add -supporting-objects to run them)."
+  fi
+elif [[ $SUPOBJ -eq 1 ]]; then
+  echo "NOTE: -supporting-objects given, but apex/$APP has no supporting-objects folder - nothing to run."
+fi
+
 # NOTE: `apex` is a SQLcl command, not SQL - `whenever sqlerror` does NOT
 # catch its failures. Success is judged from the actual output, and the
 # workspace is passed explicitly: on a schema granted to multiple
@@ -109,6 +146,7 @@ fi
 echo "== importing (output streams as SQLcl produces it) =="
 OUT="$(sql -name "$CONN" <<SQLEOF | tee /dev/stderr
 set define off
+$SUPOBJ_SQL
 apex import -input $REPO/apex/$APP -workspace $WS
 exit
 SQLEOF
@@ -122,6 +160,9 @@ if grep -qi "import successful" <<< "$OUT"; then
   tree_hash > "$REPO/tmp/.validated-$APP"
   manifest  > "$REPO/tmp/.validated-$APP.files"
   echo "Imported. Smoke-test in the browser, then pull.sh + commit."
+  if [[ -n "$SUPOBJ_SQL" ]]; then
+    echo "Supporting-object scripts ran. Failures are SILENT: check their data with a query now."
+  fi
   echo "NOTE: the import disabled any scheduled jobs in the target app."
   echo "      Dev apps: usually fine. PRODUCTION promote: run the manual"
   echo "      re-enable scripts - see scripts/prod-promote/README.md"
