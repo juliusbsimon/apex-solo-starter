@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # HUMAN-ONLY. Promote a working copy to the MAIN app by replace.
-# Usage: promote.sh MAIN_APP_ID [SRC_APP_DIR] [CONN] [WORKSPACE]
+# Usage: promote.sh [-supporting-objects] MAIN_APP_ID [SRC_APP_DIR] [CONN] [WORKSPACE]
 #   MAIN_APP_ID  the app to REPLACE (e.g. 102) - required, never defaulted
 #   SRC_APP_DIR  dir under apex/ holding the working copy's export
 #                (default: the stamped app, normally the working copy)
+#   -supporting-objects
+#                also run the source's supporting-object scripts in the
+#                import session. Off by default; listed in the PROMOTE banner
+#                that you confirm. See docs/apexlang-notes.md, "Supporting
+#                objects".
 #
 # This REPLACES the main application with the working copy's source.
 # Procedure (docs/apexlang-notes.md, "Promoting a working copy to
@@ -18,7 +23,15 @@
 set -euo pipefail
 command -v sql >/dev/null 2>&1 || PATH="$HOME/sqlcl/bin:$PATH"
 
-TARGET="${1:?usage: promote.sh MAIN_APP_ID [SRC_APP_DIR] [CONN] [WORKSPACE]}"
+SUPOBJ=0
+while [[ "${1:-}" == -* ]]; do
+  case "$1" in
+    -supporting-objects) SUPOBJ=1 ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
+  esac
+  shift
+done
+TARGET="${1:?usage: promote.sh [-supporting-objects] MAIN_APP_ID [SRC_APP_DIR] [CONN] [WORKSPACE]}"
 APP="${2:-__APP__}"
 CONN="${3:-__CONN__}"
 WS="${4:-__WORKSPACE__}"
@@ -76,6 +89,25 @@ if [[ -d "$BK/f$TARGET/supporting_objects" || -d "$BK/f$TARGET/application/suppo
   echo "NOTE: main app $TARGET has supporting objects - check the working copy carries them too."
 fi
 
+# supporting-object scripts: opt-in, shown in the banner below, run in the
+# import session (`apex import` never runs them by itself)
+SO="$SRC/supporting-objects"
+SUPOBJ_SQL=""; SO_LINE="not run (add -supporting-objects to run them)"
+if [[ -d "$SO" && $SUPOBJ -eq 1 ]]; then
+  SUPOBJ_SQL="exec apex_application_install.set_auto_install_sup_obj(p_auto_install_sup_obj => true)"
+  SO_LINE="WILL RUN in the app's schema:"
+  for f in "$SO"/install-scripts/*.sql "$SO"/upgrade-scripts/*.sql; do
+    [[ -f "$f" ]] && SO_LINE+=$'\n'"          ${f#"$SO"/}"
+  done
+  grep -q "upgradeWhenSqlQuery" "$SO/supporting-objects.apx" 2>/dev/null \
+    && SO_LINE+=$'\n'"          (upgrade query set: if it returns a row, UPGRADE scripts run instead)"
+  SO_LINE+=$'\n'"          failures are SILENT - check their data after the promote"
+elif [[ $SUPOBJ -eq 1 ]]; then
+  SO_LINE="none - apex/$APP has no supporting-objects folder"
+elif [[ ! -d "$SO" ]]; then
+  SO_LINE="none in apex/$APP"
+fi
+
 # ---- 4. typed confirmation -----------------------------------------------------
 cat <<EOF
 
@@ -84,6 +116,7 @@ cat <<EOF
           $T_PAGES pages, last changed $T_UPD by $T_BY
  WITH     apex/$APP  (working copy app ${SRC_ID:-?})
  KEEPS    main's id, name and alias
+ SCRIPTS  supporting objects: $SO_LINE
  BACKUP   $BK
  AFTER    every automation / REST sync in app $TARGET is DISABLED
           until you run scripts/prod-promote/*.sql
@@ -100,6 +133,7 @@ ALIAS_ARG=""; [[ -n "$T_ALIAS" ]] && ALIAS_ARG="-alias $T_ALIAS"
 echo "== promoting: importing apex/$APP over app $TARGET =="
 OUT="$(sql -name "$CONN" <<SQLEOF | tee /dev/stderr
 set define off
+$SUPOBJ_SQL
 apex import -input $SRC -id $TARGET -name "$T_NAME" $ALIAS_ARG -workspace $WS
 exit
 SQLEOF
@@ -117,7 +151,7 @@ cat <<EOF
 PROMOTED: app $TARGET now runs apex/$APP.  Remaining steps (manual, on purpose):
   1. Re-enable scheduled jobs:  scripts/prod-promote/*.sql  (see its README),
      then confirm one automation actually fires.
-  2. Smoke-test app $TARGET in the browser.
+  2. Smoke-test app $TARGET in the browser.$( [[ -n "$SUPOBJ_SQL" ]] && printf '\n     Supporting-object scripts ran: check their data with a query (failures are silent).' || true )
   3. Retire the promoted working copy and cut a fresh one from app $TARGET;
      the new copy has a NEW app id - retarget deployments/*.json and the
      app dir (see docs/apexlang-notes.md).

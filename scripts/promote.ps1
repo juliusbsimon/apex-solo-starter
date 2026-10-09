@@ -1,10 +1,14 @@
 <# HUMAN-ONLY. Promote a working copy to the MAIN app by replace.
-   Usage: promote.ps1 -Target MAIN_APP_ID [-App SRC_APP_DIR] [-Conn CONN] [-Workspace WS]
+   Usage: promote.ps1 -Target MAIN_APP_ID [-SupportingObjects] [-App SRC_APP_DIR] [-Conn CONN] [-Workspace WS]
+     -SupportingObjects  also run the source's supporting-object scripts in the
+                         import session (off by default; listed in the banner
+                         you confirm). See docs\apexlang-notes.md.
    Same procedure as promote.sh: target sanity, validate, MANDATORY backup
    of main, typed confirmation (type the main app id), import keeping main's
    id/name/alias, then the manual post-steps. #>
 param(
   [Parameter(Mandatory=$true)][int]$Target,
+  [switch]$SupportingObjects,
   [string]$App       = "__APP__",
   [string]$Conn      = "__CONN__",
   [string]$Workspace = "__WORKSPACE__"
@@ -59,6 +63,25 @@ exit success
 "@ | sql -name $Conn
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $bk "f$Target\install.sql"))) { throw "backup export incomplete - NOT promoting" }
 
+# supporting-object scripts: opt-in, shown in the banner, run in the import session
+$so = Join-Path $src "supporting-objects"
+$supObjSql = ""
+$soLines = @("not run (add -SupportingObjects to run them)")
+if ((Test-Path $so) -and $SupportingObjects) {
+  $supObjSql = "exec apex_application_install.set_auto_install_sup_obj(p_auto_install_sup_obj => true)"
+  $soLines = @("WILL RUN in the app's schema:")
+  Get-ChildItem (Join-Path $so "install-scripts\*.sql"), (Join-Path $so "upgrade-scripts\*.sql") -ErrorAction SilentlyContinue |
+    ForEach-Object { $soLines += ("          " + $_.Directory.Name + "\" + $_.Name) }
+  if (Select-String -Path (Join-Path $so "supporting-objects.apx") -Pattern "upgradeWhenSqlQuery" -Quiet -ErrorAction SilentlyContinue) {
+    $soLines += "          (upgrade query set: if it returns a row, UPGRADE scripts run instead)"
+  }
+  $soLines += "          failures are SILENT - check their data after the promote"
+} elseif ($SupportingObjects) {
+  $soLines = @("none - apex\$App has no supporting-objects folder")
+} elseif (-not (Test-Path $so)) {
+  $soLines = @("none in apex\$App")
+}
+
 # 4. typed confirmation
 Write-Host ""
 Write-Host "================================ PROMOTE =================================" -ForegroundColor Yellow
@@ -66,6 +89,7 @@ Write-Host " REPLACE  main app $Target  `"$tName`"  (alias: $(if ($tAlias) { $tA
 Write-Host "          $tPages pages, last changed $tUpd by $tBy"
 Write-Host " WITH     apex\$App  (working copy app $srcId)"
 Write-Host " KEEPS    main's id, name and alias"
+Write-Host (" SCRIPTS  supporting objects: " + ($soLines -join "`n"))
 Write-Host " BACKUP   $bk"
 Write-Host " AFTER    every automation / REST sync in app $Target is DISABLED until"
 Write-Host "          you run scripts\prod-promote\*.sql"
@@ -79,11 +103,14 @@ $aliasArg = if ($tAlias) { "-alias $tAlias" } else { "" }
 Write-Host "== promoting: importing apex\$App over app $Target ==" -ForegroundColor Cyan
 $out = @"
 set define off
+$supObjSql
 apex import -input $src -id $Target -name "$tName" $aliasArg -workspace $Workspace
 exit
 "@ | sql -name $Conn
 $out
-if ($out -notmatch '(?i)import successful') {
+# $out is an array of lines: `-notmatch` would return the non-matching lines
+# (never empty), so test the whole output instead
+if (-not ($out | Select-String -Pattern 'import successful' -Quiet)) {
   Write-Host "PROMOTE DID NOT SUCCEED - read the output above." -ForegroundColor Red
   Write-Host "If the import started, app $Target may be partly replaced: restore from $bk" -ForegroundColor Red
   exit 1
@@ -93,5 +120,6 @@ Write-Host ""
 Write-Host "PROMOTED: app $Target now runs apex\$App. Remaining steps (manual, on purpose):" -ForegroundColor Green
 Write-Host "  1. Re-enable scheduled jobs: scripts\prod-promote\*.sql, then confirm one automation fires."
 Write-Host "  2. Smoke-test app $Target in the browser."
+if ($supObjSql) { Write-Host "     Supporting-object scripts ran: check their data with a query (failures are silent)." -ForegroundColor Yellow }
 Write-Host "  3. Retire the promoted working copy and cut a fresh one from app $Target (new app id)."
 Write-Host "  Rollback artifact: $bk"

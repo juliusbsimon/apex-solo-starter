@@ -431,6 +431,48 @@ works — but only after these checks, learned the hard way:
   unused REST data source setting): it stays in the WC and never reaches
   main.
 
+## Supporting objects
+
+Tested on APEX 26.1 with SQLcl 26.2 (2026-10-09).
+
+- **`apex import` never runs supporting-object scripts on its own,** for a
+  new app or an existing one. It only stores them in the app.
+- **They run when the same SQLcl session first calls**
+  `exec apex_application_install.set_auto_install_sup_obj(p_auto_install_sup_obj => true)`.
+  The setting lasts for the rest of that session.
+- **`push` and `promote` only make that call when asked:**
+  - `push.sh -supporting-objects`, `push.ps1 -SupportingObjects`;
+  - `promote.sh -supporting-objects <MAIN_ID>`,
+    `promote.ps1 -Target <MAIN_ID> -SupportingObjects`.
+
+  Push lists the scripts and asks y/N; promote shows them in its banner,
+  which you confirm by typing the app id.
+- **It's off by default on purpose.** Some apps keep a full schema install
+  script there (a whole DDL dump). Running that on every push would fail or
+  do damage. Without the option, push prints a note when the app has
+  scripts it isn't running.
+- **Install or upgrade, chosen by query:**
+  - With no `upgradeWhenSqlQuery` in `supporting-objects.apx`, the install
+    scripts run on every such import, over an existing app too.
+  - If the query is set and returns a row, the upgrade scripts run instead,
+    **even for a brand-new app**: APEX only looks at the query.
+- **So scripts that run this way must be safe to run again.** Use
+  `MERGE ... WHEN NOT MATCHED` or `INSERT ... WHERE NOT EXISTS`, and never
+  overwrite rows people edit.
+- **A failing statement is skipped silently.** The statements after it
+  still run, and the import still prints "Import successful". Check the
+  data with a query afterwards.
+- **Script syntax:**
+  - scripts run as the parsing schema;
+  - a PL/SQL block ends with `/` on its own line;
+  - `&` is kept as a literal.
+- **APEXlang:** `installScript` / `upgradeScript` take no `name:` property
+  (it fails to compile); the component id is the name. Each script's file
+  goes in `supporting-objects/install-scripts/` (or `upgrade-scripts/`),
+  referenced as `script { contentFile: <file>.sql }`.
+- **Delete with care:** removing a statement from a script doesn't remove
+  rows it already inserted. Deleting them is a separate, deliberate step.
+
 ## SQLcl / environment
 
 - Piping commands into `sql /nolog` interactively can hang past a foreground
