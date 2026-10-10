@@ -89,11 +89,14 @@ def build_cmd(cid, req):
     if not app:  # single-app path: exactly the scripts' own defaults
         base = {"pull": "pull", "validate": "apex-validate",
                 "validate-all": "apex-validate",
-                "push": "push", "push-backup": "push"}[cid]
+                "push": "push", "push-backup": "push",
+                "push-supobj": "push"}[cid]
         argv = (PS + ["scripts\\%s.ps1" % base]) if WIN \
             else ["bash", "scripts/%s.sh" % base]
         if cid == "push-backup":
             argv.append("-Backup" if WIN else "-backup")
+        if cid == "push-supobj":  # opt-in: the script lists them and asks y/N
+            argv.append("-SupportingObjects" if WIN else "-supporting-objects")
         if cid == "validate":  # only what changed since the last good tree
             argv.append("-Changed" if WIN else "-changed")
         return argv, None
@@ -117,11 +120,13 @@ def build_cmd(cid, req):
         return ((PS + ["scripts\\pull.ps1", "-Conn", conn,
                        "-AppId", app_id, "-App", app]) if WIN
                 else ["bash", "scripts/pull.sh", conn, app_id, app]), None
-    # push / push-backup
+    # push / push-backup / push-supobj
     if WIN:
         argv = PS + ["scripts\\push.ps1"]
         if cid == "push-backup":
             argv.append("-Backup")
+        if cid == "push-supobj":
+            argv.append("-SupportingObjects")
         argv += ["-Conn", conn, "-App", app, "-AppId", app_id]
         if ws:
             argv += ["-Workspace", ws]
@@ -129,6 +134,8 @@ def build_cmd(cid, req):
         argv = ["bash", "scripts/push.sh"]
         if cid == "push-backup":
             argv.append("-backup")
+        if cid == "push-supobj":
+            argv.append("-supporting-objects")
         argv += [conn, app, app_id]
         if ws:
             argv.append(ws)
@@ -280,6 +287,7 @@ PAGE = r"""<!doctype html><meta charset="utf-8">
  <button class=act onclick="run('validate-all')" title="the whole tree - minutes on a big app; refreshes the baseline">Validate all</button>
  <button class=act onclick="run('push')">Push</button>
  <button class=act onclick="run('push-backup')">Push + backup</button>
+ <button class=act onclick="run('push-supobj')" title="push, and also run the app's supporting-object scripts (supporting-objects/). The script lists them and asks y/N first. A plain Push never runs them.">Push + supporting objects</button>
  <button class=act onclick="run('gitstatus')">Git status</button>
  <button class=act onclick="run('gitdiff')">Git diff</button>
  <button onclick="post('/stop',{})" style="color:#f66">Stop</button>
@@ -296,6 +304,7 @@ PAGE = r"""<!doctype html><meta charset="utf-8">
 <div style="margin-top:6px;padding:6px;border:1px solid #733">
  <b style="color:#f66">Promote</b> the selected/default app (a working copy) over main app id
  <input id=promoteTarget size=6 placeholder="e.g. 102">
+ <label title="also run the working copy's supporting-object scripts in the import; they are listed in the PROMOTE banner you confirm"><input type=checkbox id=promoteSupObj> also run supporting-object scripts</label>
  <button class=act onclick="promote()" style="color:#f66" title="REPLACES the main app - mandatory backup, then you type the id to confirm">Promote to main&hellip;</button>
 </div>
 <div style="margin-top:6px">
@@ -333,7 +342,7 @@ function appsel(){const e=document.getElementById('appsel');
   return e&&!e.parentElement.hidden?e.value:'';}
 async function run(id){
   const b={id};
-  if(['pull','validate','validate-all','push','push-backup'].includes(id)){
+  if(['pull','validate','validate-all','push','push-backup','push-supobj'].includes(id)){
     b.app=appsel();b.ws=document.getElementById('wsin').value;}
   const r=await post('/run',b);if(!r.ok)alert(r.err);}
 async function migrate(){
@@ -361,7 +370,8 @@ async function promote(){
   const t=document.getElementById('promoteTarget').value.trim();
   if(!/^\d+$/.test(t)){alert('enter the MAIN app id to replace');return;}
   if(!confirm('Promote over main app '+t+'?\n\nThis REPLACES app '+t+'. The script backs it up first and will ask you to type '+t+' again before importing.'))return;
-  const b={id:'promote',target:t,app:appsel(),ws:document.getElementById('wsin').value};
+  const b={id:'promote',target:t,app:appsel(),ws:document.getElementById('wsin').value,
+           supobj:document.getElementById('promoteSupObj').checked};
   const r=await post('/run',b);if(!r.ok)alert(r.err);}
 async function answer(a){await post('/send',{line:a});}
 // remember the admin conn across reloads (localhost page, harmless value)
@@ -478,7 +488,7 @@ class H(BaseHTTPRequestHandler):
                 if ok:
                     with lock:
                         state["chunks"].append("(when it finishes: review git diff, commit, then RESTART this GUI to load the new gui.py)\n")
-            elif cid in ("pull", "validate", "validate-all", "push", "push-backup"):
+            elif cid in ("pull", "validate", "validate-all", "push", "push-backup", "push-supobj"):
                 argv, err = build_cmd(cid, req)
                 if err:
                     return self._json({"ok": False, "err": err})
@@ -493,12 +503,15 @@ class H(BaseHTTPRequestHandler):
                 for v in (app, ws):
                     if v and not SAFE.match(v):
                         return self._json({"ok": False, "err": "invalid characters in app/workspace"})
+                supobj = req.get("supobj") is True
                 if WIN:
                     argv = PS + ["scripts\\promote.ps1", "-Target", target]
+                    if supobj: argv.append("-SupportingObjects")
                     if app: argv += ["-App", app]
                     if ws: argv += ["-Workspace", ws]
                 else:
-                    argv = ["bash", "scripts/promote.sh", target]
+                    # options go before the positional MAIN_APP_ID
+                    argv = ["bash", "scripts/promote.sh"] + (["-supporting-objects"] if supobj else []) + [target]
                     if app or ws:
                         conn = default_conn()
                         if not conn:

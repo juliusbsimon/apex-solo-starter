@@ -447,6 +447,10 @@ Tested on APEX 26.1 with SQLcl 26.2 (2026-10-09).
 
   Push lists the scripts and asks y/N; promote shows them in its banner,
   which you confirm by typing the app id.
+- **In the launchers:**
+  - GUI: a **Push + supporting objects** button, and an **also run
+    supporting-object scripts** checkbox in the Promote row.
+  - Menu: option `s`; option 9 (promote) asks whether to run them.
 - **It's off by default on purpose.** Some apps keep a full schema install
   script there (a whole DDL dump). Running that on every push would fail or
   do damage. Without the option, push prints a note when the app has
