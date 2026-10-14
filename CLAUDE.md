@@ -13,8 +13,9 @@ same time.
 - `apex/__APP__/deployments/*.json` — per-environment app IDs. Edit only when
   adding an environment.
 - `db/` — PL/SQL sources as re-runnable `CREATE OR REPLACE` scripts.
-- `db/migrations/` — ordered, run-once DDL/data scripts, named
-  `YYYYMMDD-nn-description.sql`.
+- `db/migrations/` — ordered, run-once scripts, named
+  `YYYYMMDD-nn-description.sql`. The ONLY way anything reaches the database
+  (iron rule 5): they include changed `db/` sources with `@@../file.sql`.
   (If the project adopts SQLcl Projects instead: `.dbtools/` is committed
   config, `src/database/` holds per-object exports maintained by
   `project export`, and `dist/` is generated — never hand-edited.)
@@ -72,6 +73,17 @@ same time.
    validation. It is committed, but only the export writes it.
 5. **Migration before dependent app change.** A page referencing a new column
    imports fine and fails at runtime — the `db/migrations/` script ships first.
+   **Everything the database needs ships in migration files** — tables,
+   columns, constraints, data, AND every new or changed procedure, function,
+   package, trigger, view, grant and synonym. The human's whole database step
+   is `scripts/migrate.sh db/migrations/<file>.sql ...`; never ask them to
+   compile or run any other file. A source kept in `db/` is deployed by a
+   line in the migration that includes it — `@@../p_apply_discount.sql`
+   (relative to `db/migrations/`) — or by carrying its code inline; list
+   includes in dependency order. Before handing over: run
+   `scripts/db-coverage.sh` (it must print nothing), then name every object
+   the migration creates or replaces in your message. After the human runs
+   it, confirm each of those objects in `dba_objects` with status VALID.
 6. **Static IDs are permanent.** Never rename an existing component's static
    ID; code and diffs depend on them. New components get readable, unique
    static IDs.

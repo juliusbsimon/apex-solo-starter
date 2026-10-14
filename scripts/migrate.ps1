@@ -15,6 +15,13 @@ $applied = @(); if (Test-Path $ledger) { $applied = Get-Content $ledger }
 foreach ($f in $File) {
   if (-not (Test-Path $f)) { throw "no such file: $f" }
 }
+# every changed db source must be deployed by a pending migration - catches
+# the procedure file that was written but never wired into a migration
+& (Join-Path $PSScriptRoot "db-coverage.ps1") -Conn $Conn
+if ($LASTEXITCODE -ne 0) {
+  $ans = Read-Host "Run the migration(s) anyway, leaving those files undeployed? [y/N]"
+  if ($ans -notmatch '^[yY]') { Write-Host "migrate aborted - nothing ran." -ForegroundColor Red; exit 1 }
+}
 $n = 0; $ran = 0
 foreach ($f in $File) {
   $n++

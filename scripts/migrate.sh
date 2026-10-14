@@ -38,6 +38,14 @@ for i in "${!ARGS[@]}"; do
 done
 [[ ${#FILES[@]} -ge 1 ]] || { echo "no migration files given" >&2; exit 1; }
 
+# every changed db source must be deployed by a pending migration - catches
+# the procedure file that was written but never wired into a migration
+if ! bash "$REPO/scripts/db-coverage.sh" "$CONN"; then
+  echo -n "Run the migration(s) anyway, leaving those files undeployed? [y/N] "
+  read -r ans
+  [[ "$ans" == y* || "$ans" == Y* ]] || { echo "migrate aborted - nothing ran." >&2; exit 1; }
+fi
+
 n=0
 ran=0
 for FILE in "${FILES[@]}"; do

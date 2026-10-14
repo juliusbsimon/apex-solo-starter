@@ -6,6 +6,23 @@
   current-state sources live in `db/` (or `src/database/` under SQLcl
   Projects). A migration that needs revising after it ran anywhere gets a
   *new* migration, never an edit.
+- **Everything the database needs is in a migration.** That includes code:
+  a new or changed procedure, function, package, trigger or view in `db/`
+  gets deployed by a migration line that includes it, in dependency order:
+
+  ```sql
+  -- 20261014-02-order-code.sql
+  @@../p_apply_discount.sql
+  @@../pkg_orders.sql
+  @@../trg_orders_biu.sql
+  ```
+
+  `@@` resolves relative to this folder, and the compile gate below checks
+  the included objects too. Never hand the human a source file to "compile
+  separately": a file nobody wires into a migration never reaches the
+  database. `scripts/db-coverage.sh` (no database, safe for the agent) lists
+  changed `db/` sources that no pending migration includes, and `migrate`
+  runs it first and asks before running anyway.
 - **Ship before the page.** The migration runs before the APEX change that
   depends on it — a page referencing a missing column imports fine and fails
   at runtime.
