@@ -11,6 +11,8 @@ Two ways to switch it, both human-only:
          agent mode on 12h all          all = pull push update migrate
          agent mode off
          agent mode status
+     A short lead-in is fine ("ok agent mode on", "yes, agent mode off");
+     a sentence that only mentions agent mode does nothing.
      The rest of the message (after the first line) still goes to the agent,
      so "agent mode on 4h" + newline + "pull, fix page 10, push" works.
      The UserPromptSubmit hook in .claude/settings.json runs this file with
@@ -43,7 +45,9 @@ DEFAULT_SCOPES = ["pull", "push", "update"]
 ALL_SCOPES = ["pull", "push", "update", "migrate"]
 DEFAULT_HOURS = 8
 MAX_HOURS = 24
-CHAT_RE = re.compile(r"^\s*agent[- ]mode\s+(on|off|status)\b(.*)$", re.I)
+# a short lead-in is fine: "ok agent mode on", "yes, agent mode off"
+LEAD_IN = r"(?:(?:ok(?:ay)?|yes|yep|sure|please|pls|now)\b[\s,.!:;-]*)*"
+CHAT_RE = re.compile(r"^\s*" + LEAD_IN + r"agent[- ]mode\s+(on|off|status)\b(.*)$", re.I)
 
 
 def read_token():
@@ -99,7 +103,7 @@ def parse_on_args(words):
             scopes = list(ALL_SCOPES)
         elif w in ALL_SCOPES:
             scopes.append(w)
-        elif w in ("for", "and", "with", "to", "+"):
+        elif w in ("for", "and", "with", "to", "+", "please", "pls", "thanks", "now"):
             continue
         else:
             raise ValueError("unknown word '%s' (allowed: a duration like 4h, %s, all)"

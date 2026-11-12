@@ -332,7 +332,7 @@ agent mode status
 agent mode off
 ```
 
-The command must start the message; anything on the following lines still goes to the agent (`agent mode on 4h` + newline + `pull, add a Status column to page 10, push`). At the keyboard, `python3 scripts/agent-mode.py on 8h` does the same. Maximum 24h; renew from the chat at any time.
+The command must start the message. A short lead-in is fine (`ok agent mode on`, `yes, agent mode off`), but a sentence that only mentions agent mode does nothing. Anything on the following lines still goes to the agent (`agent mode on 4h` + newline + `pull, add a Status column to page 10, push`). At the keyboard, `python3 scripts/agent-mode.py on 8h` does the same. Maximum 24h; renew from the chat at any time.
 
 **How it works.** A `UserPromptSubmit` hook in `.claude/settings.json` runs `scripts/agent-mode.py`, which writes a time-limited token to `tmp/.agent-mode` (gitignored). That hook fires only for prompts you submit, so nothing the agent reads (a web page, a file, a database row) can switch the mode on. The agent then runs `scripts/agent-run.sh pull|push|update|migrate`, which checks the token on every call. The deny rules for `pull.sh`, `push.sh`, `migrate.sh` and the rest stay in force, mode or not; the agent never runs them directly. The agent is also denied any command that names the switch or the token.
 
