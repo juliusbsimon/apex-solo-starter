@@ -215,7 +215,8 @@ do_migrate() {
   # migrations include db/ sources (@@../file.sql): ALL of db/ must be
   # committed, or what actually ran would not be in git
   if [[ -n "$(git status --porcelain -- db)" ]]; then
-    echo "REFUSED: db/ has uncommitted changes - commit the migration and every source it includes first:" >&2
+    echo "REFUSED: db/ has uncommitted changes. Commit them first: the migration, every source it" >&2
+    echo "includes, and the ledger (applied-$CONN.txt) from the last run:" >&2
     git status --short -- db >&2
     return 1
   fi
