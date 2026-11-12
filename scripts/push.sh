@@ -15,6 +15,10 @@
 #            default: some apps carry full schema install scripts there. It
 #            lists the scripts and asks first. See docs/apexlang-notes.md,
 #            "Supporting objects".
+#   -drift-checked
+#            skip gate 1: the caller has already proved there is no Builder
+#            drift. agent-run.sh passes it after its exact, file-by-file
+#            export comparison (gate 1 is day-granular and has to ask).
 # Gates, in order:
 #   1. drift: `apex list -changesSince <last pull date>` - a Builder edit
 #      made after your pull would be silently erased by the import.
@@ -26,12 +30,13 @@
 set -euo pipefail
 command -v sql >/dev/null 2>&1 || PATH="$HOME/sqlcl/bin:$PATH"
 
-BACKUP=0; FULLVAL=0; SUPOBJ=0
+BACKUP=0; FULLVAL=0; SUPOBJ=0; DRIFTOK=0
 while [[ "${1:-}" == -* ]]; do
   case "$1" in
     -backup) BACKUP=1 ;;
     -full)   FULLVAL=1 ;;
     -supporting-objects) SUPOBJ=1 ;;
+    -drift-checked) DRIFTOK=1 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
   shift
@@ -48,7 +53,9 @@ bash "$REPO/scripts/template-check.sh" 2>/dev/null || true   # one line if the t
 # Date granularity is one day, so pushes on the pull day can list your own
 # activity - that is why this asks instead of refusing outright.
 PULLSTAMP="$REPO/tmp/.pulled-$APP"
-if [[ -f "$PULLSTAMP" ]]; then
+if [[ $DRIFTOK -eq 1 ]]; then
+  echo "== drift check: done by the caller (exact export comparison) =="
+elif [[ -f "$PULLSTAMP" ]]; then
   SINCE="$(cat "$PULLSTAMP")"
   echo "== drift check: Builder changes since last pull ($SINCE) =="
   echo "   (SQLcl takes ~10s to start - output streams when it does)"

@@ -303,7 +303,7 @@ SQL> skills list
 
 The same applies to the guardrails below: **template users already have `.claude/settings.json`** — the deny/allow rules ship in the template and cover both shells. The section explains what they do and why, so you can maintain them; there is nothing to install.
 
-**Keep the push human.** The one destructive command stays a button you press after reading the diff. The loop:
+**Keep the push human** (unless you hand it over on purpose; see §3c, agent mode). The one destructive command stays a button you press after reading the diff. The loop:
 
 ```
 pull.ps1  →  tell Claude Code what to change  →  it edits + validates until green
@@ -319,6 +319,36 @@ Same shape as the VS Code loop with the agent as editor. VS Code stays useful fo
 The constraint matters: without it, agents "helpfully" refactor neighbors while fixing the error, and your diff review gets noisy exactly when you need it clean.
 
 **No standalone SQLcl on a machine?** The VS Code extension bundles one: `~/.vscode/extensions/oracle.sql-developer-<version>/dbtools/sqlcl/bin/sql` (Windows: same path under `C:\Users\<user>\.vscode\...`, `sql.exe`). Fine as a fallback for the scripts; the standalone install from `setup-prereqs.sh` is still preferred (predictable path, updated on your schedule).
+
+### 3c. Agent mode: letting the agent pull, push and update while you're away
+
+When you drive Claude Code from your phone (the desktop app's remote session, or any session you can type into), you can hand the agent the buttons for a few hours instead of exposing the GUI through a tunnel. Type this in the chat:
+
+```
+agent mode on                  # 8 hours: pull + push + update from template
+agent mode on 4h pull push     # pick the time and what is allowed
+agent mode on 12h all          # all = pull, push, update, migrate
+agent mode status
+agent mode off
+```
+
+The command must start the message; anything on the following lines still goes to the agent (`agent mode on 4h` + newline + `pull, add a Status column to page 10, push`). At the keyboard, `python3 scripts/agent-mode.py on 8h` does the same. Maximum 24h; renew from the chat at any time.
+
+**How it works.** A `UserPromptSubmit` hook in `.claude/settings.json` runs `scripts/agent-mode.py`, which writes a time-limited token to `tmp/.agent-mode` (gitignored). That hook fires only for prompts you submit, so nothing the agent reads (a web page, a file, a database row) can switch the mode on. The agent then runs `scripts/agent-run.sh pull|push|update|migrate`, which checks the token on every call. The deny rules for `pull.sh`, `push.sh`, `migrate.sh` and the rest stay in force, mode or not; the agent never runs them directly. The agent is also denied any command that names the switch or the token.
+
+**What it does unattended.** Wherever the human scripts would ask you, `agent-run.sh` refuses and says why:
+
+| | |
+|---|---|
+| Target | Always the stamped dev connection and default app. No promote, no supporting-object scripts, no other apps or connections. |
+| Pull | Refuses over uncommitted `apex/` changes. Records an exact baseline (one hash per exported file). |
+| Push | Pushes committed work only, so every push is a git commit you can read and revert. Drift check is exact: a fresh export compared file by file with the baseline, instead of the day-granular check that has to ask. Then the usual validation gate and import, then a pull so the repo matches the Builder. |
+| Update | Clean tree only; accepts the stamped defaults; flags any change to `.claude/settings.json` and `*.template.new` files. |
+| Migrate | Only when you named `migrate`; only files under `db/migrations/`, and only when everything under `db/` (the sources a migration includes) is committed. Ledger and compile gate as usual. |
+
+Every action is logged to `tmp/agent-runs.log`. The agent reports each push in the chat (commits, pages, result), and the git log holds the rest.
+
+**What it is not.** It is a guardrail against mistakes and injected instructions, not a sandbox: the agent runs as your OS user, so a deliberately hostile agent could get around file-based switches. Keep the time short, name only the scopes you need, and switch it off when you're back. Agent mode is bash-only for now (WSL/Linux sessions); the PowerShell scripts have no `agent-run` equivalent yet.
 
 ---
 

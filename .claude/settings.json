@@ -15,8 +15,11 @@
       "Bash(*refresh-ro-grants.sh*)",
       "Bash(*refresh-ro-grants.ps1*)",
       "Bash(*promote.sh*)",
-      "Bash(*promote.ps1*)"
-
+      "Bash(*promote.ps1*)",
+      "Bash(*agent-mode.py*)",
+      "Bash(*.agent-mode*)",
+      "Edit(**/.agent-mode*)",
+      "Edit(**/scripts/agent-mode.py)"
     ],
     "allow": [
       "Bash(sql /nolog*)",
@@ -24,7 +27,16 @@
       "Bash(*ro.sh*)",
       "Bash(*apex-validate.sh*)",
       "Bash(*apex-validate.ps1*)",
+      "Bash(*agent-run.sh*)",
       "Bash(python3*)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/agent-mode.py\" --hook", "timeout": 10 } ] }
+    ],
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/agent-mode.py\" --hook", "timeout": 10 } ] }
     ]
   }
 }

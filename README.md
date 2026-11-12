@@ -19,6 +19,10 @@
    Repos with several apps under `apex/` get an app dropdown in the panel
    (ids read from each app's `deployments/*.json`).
 
+   Away from the keyboard? Type `agent mode on` in the Claude Code chat and
+   the agent may pull, push and update the template for the next 8 hours,
+   through a gated wrapper with an exact drift check (RUNBOOK §3c).
+
    New to Git entirely? Start with **[GETTING-STARTED.md](GETTING-STARTED.md)**.
 
    Full documentation: **[RUNBOOK.md](RUNBOOK.md)**
